@@ -277,6 +277,6 @@ DATABASE_URL=sqlite:///app.db
 
 ---
 
-**Desenvolvido por**: Manus AI  
+**Desenvolvido por**: Gabriel Peçanha
 **Versão**: 1.0.0  
 **Data**: Agosto 2025
