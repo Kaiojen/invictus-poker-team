@@ -1,8 +1,22 @@
-# Sistema Invictus Poker Team
+# 🎯 Sistema Invictus Poker Team
 
-## Visão Geral
+<div align="center">
+  <img src="INVICTUS_LOGOS_5.png" alt="Invictus Poker Team Logo" width="200"/>
+  
+  [![Version](https://img.shields.io/badge/version-1.0.0-gold.svg)](https://github.com/Kaiojen/invictus-poker-team)
+  [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+  [![React](https://img.shields.io/badge/react-18+-61DAFB.svg)](https://reactjs.org/)
+  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+</div>
 
-O Sistema Invictus Poker Team é uma aplicação web completa desenvolvida para gerenciar jogadores de poker profissionais, suas contas em diferentes plataformas, solicitações de reload, transações financeiras e dados pessoais. O sistema foi projetado com uma identidade visual elegante em preto e dourado, refletindo a sofisticação e profissionalismo do time Invictus Poker Team.
+## 🌟 Visão Geral
+
+O **Sistema Invictus Poker Team** é uma aplicação web completa e moderna desenvolvida para gerenciar equipes de poker profissionais. O sistema oferece controle total sobre jogadores, contas em múltiplas plataformas, transações financeiras, solicitações de reload e relatórios analíticos avançados.
+
+Desenvolvido com foco na **experiência do usuário** e **segurança**, o sistema apresenta uma identidade visual elegante em **preto e dourado**, refletindo a sofisticação e profissionalismo do time Invictus Poker Team.
+
+### 💰 Sistema Monetário
+Todas as transações e valores são gerenciados em **dólares americanos (USD)**, proporcionando padronização internacional para operações de poker online.
 
 ## Características Principais
 
@@ -17,52 +31,178 @@ O Sistema Invictus Poker Team é uma aplicação web completa desenvolvida para 
   - 🟡 Amarelo/Ouro: Avisos e pendências
   - 🔴 Vermelho: Alertas graves e críticos
 
-### Funcionalidades do Sistema
+## 🚀 Funcionalidades Principais
 
-#### Gestão de Usuários
+### 👥 **Gestão Completa de Usuários**
+- **Sistema de Autenticação Seguro**: Login/logout com sessões protegidas
+- **Controle de Acesso Multi-nível**: 
+  - 🔴 **Admin**: Controle total do sistema
+  - 🟡 **Manager**: Gestão de jogadores e aprovações
+  - 🟢 **Player**: Acesso aos próprios dados e solicitações
+  - 🔵 **Viewer**: Visualização limitada de relatórios
+- **Perfis Personalizados**: Dados completos dos jogadores
+- **Sistema de Notificações**: Alertas automáticos para pendências
+- **Gestão de Senhas**: Alteração segura com criptografia
 
-- Sistema de autenticação seguro com diferentes níveis de acesso
-- Perfis de usuário: Admin, Manager, Player, Viewer
-- Gerenciamento de dados pessoais dos jogadores
-- Sistema de notificações para pendências
+### 🎰 **Gestão de Plataformas de Poker**
+- **Cadastro de Plataformas**: PokerStars, GGPoker, PartyPoker, 888poker, etc.
+- **Múltiplas Contas por Jogador**: Controle individualizado por plataforma
+- **Monitoramento de Saldos**: Acompanhamento em tempo real ($USD)
+- **Histórico Financeiro**: Registro completo de movimentações
+- **Status das Contas**: Ativo, Inativo, Banido, Em Análise
 
-#### Gestão de Plataformas e Contas
+### 💳 **Sistema Avançado de Reload**
+- **Solicitações Inteligentes**: Interface intuitiva para jogadores
+- **Fluxo de Aprovação**: Sistema hierárquico de autorizações
+- **Histórico Detalhado**: Rastreamento completo de todas as solicitações
+- **Notificações Automáticas**: Alertas em tempo real para gestores
+- **Relatórios de Reload**: Análises de frequência e valores
 
-- Cadastro de plataformas de poker (PokerStars, GGPoker, etc.)
-- Gerenciamento de contas dos jogadores por plataforma
-- Controle de saldos e histórico financeiro
+### 📊 **Dashboard Analítico**
 
-#### Sistema de Reload
+#### Para Gestores (Admin/Manager):
+- **Visão Geral Financeira**: Total em caixa, pendências, lucros
+- **Estatísticas de Jogadores**: Performance individual e coletiva
+- **Alertas de Sistema**: Contas com problemas, reloads pendentes
+- **Relatórios Executivos**: Gráficos de performance e tendências
+- **Gestão de Usuários**: Controle completo de acessos
 
-- Solicitação de reloads pelos jogadores
-- Fluxo de aprovação/rejeição pelos gestores
-- Histórico completo de solicitações
-- Notificações automáticas
+#### Para Jogadores (Player):
+- **Bankroll Pessoal**: Saldo atual em todas as plataformas
+- **Histórico de Transações**: Movimentações financeiras detalhadas
+- **Status de Solicitações**: Acompanhamento de reloads
+- **Performance Pessoal**: Gráficos de evolução financeira
+- **Notificações**: Alertas personalizados
 
-#### Dashboard Inteligente
+### 🔔 **Sistema de Notificações**
+- **Notificações em Tempo Real**: WebSocket para atualizações instantâneas
+- **Central de Notificações**: Hub centralizado de mensagens
+- **Alertas Personalizados**: Configuração por tipo de usuário
+- **Histórico de Notificações**: Registro completo de comunicações
 
-- Visão consolidada para gestores com estatísticas gerais
-- Dashboard personalizado para jogadores com seus dados
-- Indicadores visuais de status e pendências
-- Relatórios financeiros em tempo real
+### 📈 **Relatórios e Analytics**
+- **Relatórios Financeiros**: Balanços, P&L, fluxo de caixa
+- **Análise de Performance**: Estatísticas individuais e de equipe
+- **Relatórios de Auditoria**: Logs de atividades e alterações
+- **Exportação de Dados**: PDF, Excel, CSV
+- **Gráficos Interativos**: Visualizações avançadas com Chart.js
 
-## Arquitetura do Sistema
+### 🛡️ **Segurança e Auditoria**
+- **Log de Atividades**: Registro completo de ações do sistema
+- **Backup Automático**: Proteção de dados com versionamento
+- **Controle de Sessões**: Gerenciamento seguro de logins
+- **Validação de Dados**: Proteção contra ataques e inconsistências
+- **Compliance**: Conformidade com regulamentações de poker online
 
-### Backend (Flask)
+### 📱 **Interface Responsiva**
+- **Design Mobile-First**: Otimizado para dispositivos móveis
+- **PWA Ready**: Funcionalidades de aplicativo nativo
+- **Tema Dark/Light**: Alternância entre temas (foco no dark dourado)
+- **Acessibilidade**: Conformidade com padrões WCAG
+- **Performance**: Carregamento otimizado e cache inteligente
 
-- **Framework**: Flask (Python)
-- **Banco de dados**: SQLite com WAL mode
-- **Autenticação**: Session-based com cookies seguros
-- **API**: RESTful com endpoints organizados por funcionalidade
-- **CORS**: Habilitado para integração frontend-backend
+## 🏗️ Tecnologias Utilizadas
 
-### Frontend (React)
+### **Backend Stack**
+```bash
+🐍 Python 3.11+           # Linguagem principal
+🌶️ Flask 3.1.1            # Framework web minimalista e poderoso
+🗄️ SQLAlchemy 2.0.41      # ORM para banco de dados
+🔐 Werkzeug Security      # Criptografia de senhas
+📊 SQLite + WAL Mode      # Banco de dados otimizado
+🔄 Flask-CORS             # Habilitação de Cross-Origin Requests
+📧 SMTP Integration       # Sistema de email
+🔔 Server-Sent Events     # Notificações em tempo real
+```
 
-- **Framework**: React 18 com Vite
-- **Estilização**: Tailwind CSS + shadcn/ui
-- **Ícones**: Lucide React
-- **Responsividade**: Mobile-first design
-- **Estado**: React Hooks para gerenciamento local
+### **Frontend Stack**
+```bash
+⚛️ React 18.2.0           # Biblioteca de interface de usuário
+⚡ Vite 5.0               # Build tool e dev server ultra-rápido
+🎨 Tailwind CSS 3.4       # Framework CSS utility-first
+🎯 shadcn/ui              # Componentes UI modernos e acessíveis
+🔗 Lucide React           # Ícones vetoriais elegantes
+📱 Mobile-First Design    # Responsividade prioritária
+🎭 React Hooks            # Gerenciamento de estado local
+📊 Chart.js               # Gráficos interativos
+🔔 WebSocket Client       # Comunicação em tempo real
+```
+
+### **Ferramentas de Desenvolvimento**
+```bash
+📦 pnpm                   # Gerenciador de pacotes eficiente
+🔧 ESLint + Prettier      # Linting e formatação de código
+🧪 Jest + Testing Library # Framework de testes
+🔄 Git + GitHub           # Controle de versão
+📝 JSDoc + TypeScript     # Documentação e tipagem
+🐳 Docker Ready           # Containerização preparada
+```
+
+## 🏛️ Arquitetura do Sistema
+
+### **Backend Architecture (Flask)**
+```
+📁 backend/src/
+├── 🎯 main.py                 # Aplicação principal e configuração
+├── 📊 models/                 # Modelos de dados SQLAlchemy
+│   ├── models.py             # Entidades principais do sistema
+│   ├── user.py               # Modelo de usuário
+│   ├── notifications.py      # Sistema de notificações
+│   └── messages.py           # Sistema de mensagens
+├── 🛣️ routes/                 # Endpoints da API REST
+│   ├── auth.py               # Autenticação e autorização
+│   ├── users.py              # Gestão de usuários
+│   ├── platforms.py          # Gestão de plataformas
+│   ├── accounts.py           # Contas dos jogadores
+│   ├── reload_requests.py    # Sistema de reload
+│   ├── transactions.py       # Transações financeiras
+│   ├── dashboard.py          # Dados dos dashboards
+│   ├── reports.py            # Relatórios e analytics
+│   ├── notifications.py     # API de notificações
+│   ├── backup.py             # Sistema de backup
+│   └── audit.py              # Logs de auditoria
+├── 🔧 utils/                  # Utilitários e serviços
+│   ├── init_data.py          # Dados iniciais do sistema
+│   ├── backup_manager.py     # Gerenciamento de backups
+│   ├── notification_service.py # Serviço de notificações
+│   └── report_generator.py   # Gerador de relatórios
+├── 🛡️ middleware/             # Middlewares personalizados
+│   └── audit_middleware.py   # Auditoria de requisições
+└── 💾 database/              # Banco de dados e backups
+    ├── app.db                # Banco SQLite principal
+    └── backups/              # Backups automáticos
+```
+
+### **Frontend Architecture (React)**
+```
+📁 frontend/src/
+├── 🚀 main.jsx               # Ponto de entrada da aplicação
+├── 📱 App.jsx                # Componente raiz e roteamento
+├── 🎨 App.css                # Estilos personalizados globais
+├── 🧩 components/            # Componentes React organizados
+│   ├── 🔐 LoginForm.jsx      # Formulário de autenticação
+│   ├── 📊 Dashboard.jsx      # Dashboard principal
+│   ├── 👥 PlayerManagement.jsx # Gestão de jogadores
+│   ├── 🎰 PlatformAccountsView.jsx # Visualização de contas
+│   ├── 💳 ReloadRequestModal.jsx # Modal de solicitação
+│   ├── 📈 ReportManagement.jsx # Gestão de relatórios
+│   ├── 🔔 NotificationCenter.jsx # Central de notificações
+│   ├── 📋 Planilha.jsx       # Sistema de planilhas
+│   ├── 🏦 RetaDashboard.jsx  # Dashboard de retas
+│   ├── 🛡️ AuditoriaEnhanced.jsx # Sistema de auditoria
+│   └── ui/                   # Componentes UI reutilizáveis
+│       ├── button.jsx        # Botões personalizados
+│       ├── card.jsx          # Cards de conteúdo
+│       ├── table.jsx         # Tabelas de dados
+│       ├── form.jsx          # Formulários
+│       ├── chart.jsx         # Componentes de gráfico
+│       └── [+40 componentes] # shadcn/ui completo
+├── 🎣 hooks/                 # React Hooks customizados
+│   ├── useSSE.js             # Hook para Server-Sent Events
+│   └── use-mobile.js         # Hook para detecção mobile
+└── 🔧 lib/                   # Utilitários e configurações
+    └── utils.js              # Funções auxiliares
+```
 
 ### Estrutura de Dados
 
@@ -75,30 +215,77 @@ O Sistema Invictus Poker Team é uma aplicação web completa desenvolvida para 
 5. **Transaction**: Histórico de transações financeiras
 6. **PlayerData**: Dados específicos dos jogadores
 
-## Instalação e Configuração
+## 🛠️ Instalação e Configuração
 
-### Pré-requisitos
-
-- Python 3.11+
-- Node.js 20+
-- pnpm (gerenciador de pacotes)
-
-### Backend (Flask)
-
+### **Pré-requisitos**
 ```bash
-cd invictus-poker-backend
+🐍 Python 3.11+              # Linguagem backend
+📦 Node.js 20+               # Runtime JavaScript  
+⚡ pnpm (recomendado)         # Gerenciador de pacotes eficiente
+🔧 Git                       # Controle de versão
+```
+
+### **📥 Clonagem do Repositório**
+```bash
+git clone https://github.com/Kaiojen/invictus-poker-team.git
+cd invictus-poker-team
+```
+
+### **🐍 Configuração do Backend (Flask)**
+```bash
+# Navegar para o diretório backend
+cd backend
+
+# Ativar ambiente virtual (Linux/Mac)
 source venv/bin/activate
+
+# Ativar ambiente virtual (Windows)
+venv\Scripts\activate
+
+# Instalar dependências
 pip install -r requirements.txt
+
+# Inicializar banco de dados
+python init_db.py
+
+# Executar servidor de desenvolvimento
 python src/main.py
 ```
 
-### Frontend (React)
+**🌐 Backend rodando em:** `http://localhost:5000`
 
+### **⚛️ Configuração do Frontend (React)**
 ```bash
-cd invictus-poker-frontend
+# Navegar para o diretório frontend
+cd frontend
+
+# Instalar dependências
 pnpm install
+
+# Executar servidor de desenvolvimento
 pnpm run dev --host
+
+# Ou usando npm/yarn
+npm install && npm run dev
+yarn install && yarn dev
 ```
+
+**🌐 Frontend rodando em:** `http://localhost:5173`
+
+### **🚀 Execução Completa (Desenvolvimento)**
+```bash
+# Terminal 1 - Backend
+cd backend && source venv/bin/activate && python src/main.py
+
+# Terminal 2 - Frontend  
+cd frontend && pnpm run dev --host
+```
+
+### **📊 Inicialização dos Dados**
+O sistema vem com dados de exemplo pré-configurados:
+- Usuários de teste com diferentes permissões
+- Plataformas de poker populares
+- Dados de demonstração para desenvolvimento
 
 ## Usuários Padrão
 
@@ -257,26 +444,128 @@ DATABASE_URL=sqlite:///app.db
 - Versionamento de schema
 - Procedimentos de restore
 
-## Roadmap
+## 🔮 Roadmap
 
-### Próximas Funcionalidades
+### **🚀 Próximas Funcionalidades (v1.1)**
+- [ ] Sistema de relatórios avançados com BI
+- [ ] Integração com APIs oficiais das plataformas
+- [ ] Notificações push para mobile
+- [ ] Aplicativo móvel nativo (React Native)
+- [ ] Sistema de chat interno em tempo real
+- [ ] Dashboard de analytics avançado
+- [ ] Sistema de metas e objetivos
+- [ ] Integração com bancos e carteiras digitais
 
-1. Sistema de relatórios avançados
-2. Integração com APIs das plataformas
-3. Notificações push
-4. App mobile
-5. Sistema de chat interno
+### **⚙️ Melhorias Técnicas (v2.0)**
+- [ ] Migração para PostgreSQL
+- [ ] Cache distribuído com Redis
+- [ ] Containerização completa com Docker
+- [ ] Pipeline CI/CD com GitHub Actions
+- [ ] Monitoramento com Prometheus + Grafana
+- [ ] Logs centralizados com ELK Stack
+- [ ] Testes automatizados (Unit + E2E)
+- [ ] API GraphQL opcional
 
-### Melhorias Técnicas
+## 🤝 Contribuição
 
-1. Migração para PostgreSQL
-2. Cache com Redis
-3. Containerização com Docker
-4. CI/CD pipeline
-5. Monitoramento com Prometheus
+Contribuições são bem-vindas! Para contribuir com o projeto:
+
+### **📋 Como Contribuir**
+1. **Fork** o projeto
+2. **Clone** o fork para sua máquina
+3. **Crie** uma branch para sua feature (`git checkout -b feature/NovaFuncionalidade`)
+4. **Commit** suas mudanças (`git commit -m 'Adiciona Nova Funcionalidade'`)
+5. **Push** para a branch (`git push origin feature/NovaFuncionalidade`)
+6. **Abra** um Pull Request
+
+### **🐛 Reportando Bugs**
+- Use as [Issues do GitHub](https://github.com/Kaiojen/invictus-poker-team/issues)
+- Inclua informações detalhadas sobre o problema
+- Adicione passos para reproduzir o bug
+- Inclua capturas de tela se relevante
+
+### **💡 Sugestões de Funcionalidades**
+- Abra uma [Discussion](https://github.com/Kaiojen/invictus-poker-team/discussions)
+- Descreva detalhadamente a funcionalidade desejada
+- Explique o valor que ela agregaria ao sistema
+
+## 🚀 Deploy e Produção
+
+### **🐳 Docker (Recomendado)**
+```bash
+# Build das imagens
+docker-compose build
+
+# Execução em produção
+docker-compose up -d
+
+# Logs
+docker-compose logs -f
+```
+
+### **☁️ Deploy Manual**
+```bash
+# Backend (produção)
+gunicorn --bind 0.0.0.0:5000 --workers 4 src.main:app
+
+# Frontend (build)
+pnpm run build
+# Servir arquivos estáticos via Nginx
+```
+
+### **🔧 Variáveis de Ambiente**
+```bash
+# Backend (.env)
+FLASK_ENV=production
+SECRET_KEY=sua-chave-super-secreta-aqui
+DATABASE_URL=sqlite:///app.db
+CORS_ORIGINS=https://seudominio.com
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=seu-email@gmail.com
+SMTP_PASSWORD=sua-senha-app
+
+# Frontend (.env)
+VITE_API_URL=https://api.seudominio.com
+VITE_ENVIRONMENT=production
+```
+
+## 📄 Licença
+
+Este projeto está licenciado sob a **MIT License** - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 👨‍💻 Desenvolvimento & Créditos
+
+### **🎯 Desenvolvedor Principal**
+**Gabriel Peçanha** - *Desenvolvedor Full Stack*
+- 🐍 Backend (Python/Flask)
+- ⚛️ Frontend (React/TypeScript)  
+- 🎨 Design System & UI/UX
+- 🗄️ Arquitetura de Banco de Dados
+- 🛡️ Segurança & Performance
+
+### **📧 Contato & Suporte**
+- 📧 **Email**: [gabriel.pecanha@email.com](mailto:gabriel.pecanha@email.com)
+- 💼 **LinkedIn**: [Gabriel Peçanha](https://linkedin.com/in/gabriel-pecanha)
+- 🐙 **GitHub**: [@Kaiojen](https://github.com/Kaiojen)
+
+### **🏆 Agradecimentos**
+- **Invictus Poker Team** - Inspiração e requisitos do projeto
+- **Comunidade Open Source** - Ferramentas e bibliotecas utilizadas
+- **shadcn/ui** - Sistema de componentes elegante
+- **Lucide Icons** - Ícones modernos e consistentes
 
 ---
 
-**Desenvolvido por**: Manus AI  
-**Versão**: 1.0.0  
-**Data**: Agosto 2025
+<div align="center">
+  
+**🎯 Sistema Invictus Poker Team**  
+*Desenvolvido com ❤️ por Gabriel Peçanha*
+  
+[![Version](https://img.shields.io/badge/version-1.0.0-gold.svg)](https://github.com/Kaiojen/invictus-poker-team)
+[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/Kaiojen/invictus-poker-team.svg)](https://github.com/Kaiojen/invictus-poker-team/stargazers)
+
+**⭐ Se este projeto foi útil, considere dar uma estrela!**
+
+</div>
