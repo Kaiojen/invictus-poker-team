@@ -1,10 +1,13 @@
 # render.yaml - Configuração específica para Render
+# FORÇA O RENDER A USAR PYTHON
 services:
   - type: web
     name: invictus-poker-backend
     env: python
+    runtime: python
+    pythonVersion: 3.11.0  
     buildCommand: pip install -r requirements.txt
-    startCommand: ./start.sh
+    startCommand: chmod +x start.sh && ./start.sh
     plan: free
     region: ohio
     buildFilter:
@@ -12,8 +15,12 @@ services:
       - backend/**
       ignoredPaths:
       - frontend/**
+      - "*.json"
+      - "node_modules/**"
     envVars:
     - key: PYTHON_VERSION
       value: 3.11.0
     - key: FLASK_ENV
       value: production
+    - key: PYTHONPATH
+      value: src
