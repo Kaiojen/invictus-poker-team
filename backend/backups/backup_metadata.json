@@ -116,8 +116,17 @@
       "description": "Backup inicial - Sistema iniciado",
       "size": 4096,
       "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250822_000811.db",
+      "path": "backups\\invictus_backup_20250822_000811.db",
+      "timestamp": "20250822_000811",
+      "datetime": "2025-08-22T00:08:11.853901",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
     }
   ],
   "created": "2025-08-20T16:24:11.202427",
-  "last_backup": "2025-08-22T00:02:44.186888"
+  "last_backup": "2025-08-22T00:08:11.853901"
 }

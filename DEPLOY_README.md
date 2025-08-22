@@ -54,12 +54,13 @@
    - **New → PostgreSQL**
    - Conecte ao Web Service
 
-6. **Environment Variables**:
+6. **Environment Variables** (Adicione uma por uma):
    ```
-   DATABASE_URL: [Auto-gerado pelo Render]
-   SECRET_KEY: sua-chave-super-secreta-aqui
+   DATABASE_URL: [Auto-gerado pelo PostgreSQL]
+   SECRET_KEY: invictus-poker-super-secret-key-2024
    FLASK_ENV: production
    CORS_ORIGINS: https://seu-frontend.vercel.app
+   PYTHON_VERSION: 3.11.0
    ```
 
 ---
