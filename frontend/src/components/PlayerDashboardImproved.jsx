@@ -136,19 +136,13 @@ const PlayerDashboardImproved = ({ user }) => {
     );
   }
 
-  const totalBalance =
-    dashboardData?.accounts?.reduce(
-      (sum, acc) => sum + (acc.current_balance || 0),
-      0
-    ) || 0;
-  const totalInitialBalance =
-    dashboardData?.accounts?.reduce(
-      (sum, acc) => sum + (acc.initial_balance || 0),
-      0
-    ) || 0;
-  const totalPnL = totalBalance - totalInitialBalance;
+  // 🚨 CORREÇÃO: Usar dados corretos do backend ao invés de cálculos manuais
+  const totalBalance = dashboardData?.summary?.total_current_balance || 0;
+  const totalInvestment = dashboardData?.summary?.total_investment || 0; // Já inclui reloads
+  const totalPnL = dashboardData?.summary?.total_pnl || 0; // P&L correto do backend
+  const approvedReloads = dashboardData?.summary?.approved_reload_amount || 0;
   const pnlPercentage =
-    totalInitialBalance > 0 ? (totalPnL / totalInitialBalance) * 100 : 0;
+    totalInvestment > 0 ? (totalPnL / totalInvestment) * 100 : 0;
 
   return (
     <div className="space-y-6">

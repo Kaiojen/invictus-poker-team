@@ -238,9 +238,25 @@ def sanitize_log_data(data):
     
     sanitized = data.copy()
     
-    for field in AUDIT_CONFIG['sensitive_fields']:
+    # Campos que devem ser completamente removidos
+    redacted_fields = ['password', 'password_hash', 'totp_secret', 'recovery_codes']
+    
+    # Campos que devem ser mascarados
+    masked_fields = {
+        'pix_key': 4,
+        'bank_account': 3,
+        'document': 2,
+        'phone': 2
+    }
+    
+    for field in redacted_fields:
         if field in sanitized:
             sanitized[field] = '[REDACTED]'
+    
+    for field, visible_chars in masked_fields.items():
+        if field in sanitized and sanitized[field]:
+            from src.utils.encryption import mask_sensitive_data
+            sanitized[field] = mask_sensitive_data(str(sanitized[field]), visible_chars=visible_chars)
     
     # Limitar tamanho dos campos
     for key, value in sanitized.items():

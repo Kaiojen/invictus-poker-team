@@ -41,6 +41,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import NotificationTemplates from "./NotificationTemplates";
 
 const NotificationCenter = ({ user }) => {
   const [notifications, setNotifications] = useState([]);
@@ -50,6 +51,12 @@ const NotificationCenter = ({ user }) => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [filter, setFilter] = useState("all"); // all, unread, urgent
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [entityDetails, setEntityDetails] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Templates de notificação
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateRequest, setTemplateRequest] = useState(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -72,7 +79,7 @@ const NotificationCenter = ({ user }) => {
         params.append("unread_only", "true");
       }
 
-      const response = await fetch(`/api/notifications?${params.toString()}`, {
+      const response = await fetch(`/api/notifications/?${params.toString()}`, {
         credentials: "include",
       });
 
@@ -148,25 +155,28 @@ const NotificationCenter = ({ user }) => {
 
   const getNotificationIcon = (type, category) => {
     if (category === "urgent")
-      return <Zap className="w-4 h-4 text-amber-500" />;
+      return <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
 
     switch (type) {
       case "success":
-        return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+        return (
+          <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+        );
       case "warning":
-        return <AlertTriangle className="w-4 h-4 text-amber-500" />;
+        return (
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+        );
       case "error":
-        return <XCircle className="w-4 h-4 text-rose-500" />;
+        return <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />;
       case "urgent":
-        return <Zap className="w-4 h-4 text-amber-500" />;
+        return <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />;
       default:
-        return <Info className="w-4 h-4 text-blue-400" />;
+        return <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />;
     }
   };
 
   const getNotificationBadgeColor = (type, isUrgent) => {
     if (isUrgent) return "destructive";
-
     switch (type) {
       case "success":
         return "default";
@@ -206,7 +216,161 @@ const NotificationCenter = ({ user }) => {
       // Mostrar detalhes no modal
       setSelectedNotification(notification);
       setShowDialog(true);
+      setEntityDetails(null);
+      // Carregar detalhes da entidade relacionada (para habilitar botões de ação)
+      try {
+        if (
+          notification.related_entity_type === "reload_request" &&
+          notification.related_entity_id
+        ) {
+          const res = await fetch(
+            `/api/reload_requests/${notification.related_entity_id}`,
+            { credentials: "include" }
+          );
+          if (res.ok) {
+            const json = await res.json();
+            setEntityDetails({ type: "reload", data: json.reload_request });
+          }
+        } else if (
+          notification.related_entity_type === "withdrawal_request" &&
+          notification.related_entity_id
+        ) {
+          const res = await fetch(
+            `/api/withdrawal_requests/${notification.related_entity_id}`,
+            { credentials: "include" }
+          );
+          if (res.ok) {
+            const json = await res.json();
+            setEntityDetails({
+              type: "withdrawal",
+              data: json.withdrawal_request,
+            });
+          }
+        }
+      } catch (e) {
+        // Silencioso; ainda mostramos o modal sem ações
+      }
     }
+  };
+
+  // Templates de notificação
+  const openTemplateModal = (action, entityId, entityType) => {
+    setTemplateRequest({
+      action,
+      entityId,
+      entityType,
+      type: entityType === "reload_request" ? "reload" : "withdrawal",
+    });
+    setShowTemplateModal(true);
+  };
+
+  const handleTemplateSubmit = async (templateData) => {
+    const { action, entityId, entityType } = templateRequest;
+
+    setActionLoading(true);
+    try {
+      let endpoint;
+      let payload = {};
+
+      if (entityType === "reload_request") {
+        endpoint = `/api/reload_requests/${entityId}/${action}`;
+        payload = {
+          manager_notes: templateData.message,
+          template_id: templateData.templateId,
+        };
+      } else if (entityType === "withdrawal_request") {
+        endpoint = `/api/withdrawal_requests/${entityId}/${action}`;
+        if (action === "complete") {
+          payload = {
+            completion_notes: templateData.message,
+            template_id: templateData.templateId,
+          };
+        } else {
+          payload = {
+            manager_notes: templateData.message,
+            template_id: templateData.templateId,
+          };
+        }
+      }
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        // Criar notificação personalizada para o jogador
+        if (entityDetails?.user_id) {
+          await createPlayerNotification(
+            entityDetails.user_id,
+            templateData.message
+          );
+        }
+
+        toast.success(
+          `Solicitação ${
+            action === "approve"
+              ? "aprovada"
+              : action === "reject"
+              ? "rejeitada"
+              : "completada"
+          } com sucesso!`
+        );
+        await fetchNotifications();
+        setShowDialog(false);
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || "Erro ao processar ação");
+      }
+    } catch (error) {
+      console.error("Erro ao processar ação:", error);
+      toast.error("Erro ao processar ação");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const createPlayerNotification = async (userId, message) => {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          user_id: userId,
+          title: "📋 Atualização da Solicitação",
+          message,
+          type: "info",
+          is_urgent: false,
+        }),
+      });
+    } catch (error) {
+      console.error("Erro ao criar notificação:", error);
+    }
+  };
+
+  // Ações de Reload
+  const approveReload = async (id) => {
+    openTemplateModal("approve", id, "reload_request");
+  };
+
+  const rejectReload = async (id) => {
+    openTemplateModal("reject", id, "reload_request");
+  };
+
+  // Ações de Saque
+  const approveWithdrawal = async (id) => {
+    openTemplateModal("approve", id, "withdrawal_request");
+  };
+
+  const rejectWithdrawal = async (id) => {
+    openTemplateModal("reject", id, "withdrawal_request");
+  };
+
+  const completeWithdrawal = async (id) => {
+    openTemplateModal("complete", id, "withdrawal_request");
   };
 
   if (loading) {
@@ -323,10 +487,10 @@ const NotificationCenter = ({ user }) => {
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 cursor-pointer transition-colors hover:bg-secondary/50 ${
+                    className={`p-4 cursor-pointer transition-colors notification-light ${
                       !notification.is_read
-                        ? "bg-blue-50 dark:bg-blue-950/20"
-                        : ""
+                        ? "bg-primary/5 dark:bg-primary/10 border-l-2 border-primary"
+                        : "hover:bg-muted/30"
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
@@ -380,19 +544,47 @@ const NotificationCenter = ({ user }) => {
                             {notification.time_ago}
                           </span>
 
-                          {!notification.is_read && (
+                          <div className="flex items-center gap-1">
+                            {!notification.is_read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markAsRead(notification.id);
+                                }}
+                                className="h-6 px-2"
+                              >
+                                <Check className="w-3 h-3" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation();
-                                markAsRead(notification.id);
+                                const res = await fetch(
+                                  `/api/notifications/${notification.id}`,
+                                  { method: "DELETE", credentials: "include" }
+                                );
+                                if (res.ok) {
+                                  setNotifications((prev) =>
+                                    prev.filter((n) => n.id !== notification.id)
+                                  );
+                                  setStats((prev) => ({
+                                    ...prev,
+                                    total: Math.max(0, prev.total - 1),
+                                    unread:
+                                      prev.unread -
+                                      (notification.is_read ? 0 : 1),
+                                  }));
+                                }
                               }}
-                              className="h-6 px-2"
+                              className="h-6 px-2 text-rose-600 dark:text-rose-400"
                             >
-                              <Check className="w-3 h-3" />
+                              Remover
                             </Button>
-                          )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -427,19 +619,83 @@ const NotificationCenter = ({ user }) => {
             <p className="text-sm">{selectedNotification?.message}</p>
 
             {selectedNotification?.is_urgent && (
-              <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="mt-4 p-3 bg-red-600/20 rounded-lg border border-red-500/50">
                 <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                  <Zap className="w-4 h-4 text-red-400" />
+                  <span className="text-sm font-medium text-red-300">
                     Esta é uma notificação urgente
                   </span>
                 </div>
               </div>
             )}
+
+            {entityDetails && (
+              <div className="mt-4 text-sm rounded-md border border-border p-3 bg-secondary/30">
+                {entityDetails.type === "reload" && (
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">Tipo:</span>{" "}
+                      Reload
+                    </div>
+                    {entityDetails.data?.status && (
+                      <div>
+                        <span className="text-muted-foreground">Status:</span>{" "}
+                        {entityDetails.data.status}
+                      </div>
+                    )}
+                    {entityDetails.data?.amount != null && (
+                      <div>
+                        <span className="text-muted-foreground">Valor:</span> ${" "}
+                        {Number(entityDetails.data.amount).toFixed(2)}
+                      </div>
+                    )}
+                    {entityDetails.data?.platform_name && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          Plataforma:
+                        </span>{" "}
+                        {entityDetails.data.platform_name}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {entityDetails.type === "withdrawal" && (
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-muted-foreground">Tipo:</span> Saque
+                    </div>
+                    {entityDetails.data?.status && (
+                      <div>
+                        <span className="text-muted-foreground">Status:</span>{" "}
+                        {entityDetails.data.status}
+                      </div>
+                    )}
+                    {entityDetails.data?.amount != null && (
+                      <div>
+                        <span className="text-muted-foreground">Valor:</span> ${" "}
+                        {Number(entityDetails.data.amount).toFixed(2)}
+                      </div>
+                    )}
+                    {entityDetails.data?.platform_name && (
+                      <div>
+                        <span className="text-muted-foreground">
+                          Plataforma:
+                        </span>{" "}
+                        {entityDetails.data.platform_name}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDialog(false)}
+              className="border-border text-foreground"
+            >
               Fechar
             </Button>
             {selectedNotification?.action_url && (
@@ -451,9 +707,78 @@ const NotificationCenter = ({ user }) => {
                 Ir para ação
               </Button>
             )}
+            {/* Botões de ação diretos */}
+            {user?.role &&
+              (user.role === "admin" || user.role === "manager") &&
+              entityDetails && (
+                <>
+                  {entityDetails.type === "reload" &&
+                    entityDetails.data?.status === "pending" && (
+                      <>
+                        <Button
+                          disabled={actionLoading}
+                          onClick={() => approveReload(entityDetails.data.id)}
+                        >
+                          Aprovar Reload
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          disabled={actionLoading}
+                          onClick={() => rejectReload(entityDetails.data.id)}
+                        >
+                          Rejeitar Reload
+                        </Button>
+                      </>
+                    )}
+                  {entityDetails.type === "withdrawal" && (
+                    <>
+                      {entityDetails.data?.status === "pending" && (
+                        <>
+                          <Button
+                            disabled={actionLoading}
+                            onClick={() =>
+                              approveWithdrawal(entityDetails.data.id)
+                            }
+                          >
+                            Aprovar Saque
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            disabled={actionLoading}
+                            onClick={() =>
+                              rejectWithdrawal(entityDetails.data.id)
+                            }
+                          >
+                            Rejeitar Saque
+                          </Button>
+                        </>
+                      )}
+                      {entityDetails.data?.status === "approved" && (
+                        <Button
+                          disabled={actionLoading}
+                          onClick={() =>
+                            completeWithdrawal(entityDetails.data.id)
+                          }
+                        >
+                          Marcar como Concluído
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Templates de Notificação */}
+      <NotificationTemplates
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        request={templateRequest}
+        type={templateRequest?.type}
+        onSubmit={handleTemplateSubmit}
+      />
     </div>
   );
 };

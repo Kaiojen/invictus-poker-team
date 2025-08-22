@@ -1,0 +1,505 @@
+/* Correções de legibilidade para modais e componentes escuros */
+
+/* Modal de Nova/Editar Reta - harmonizado com tema dourado */
+.reta-modal-fix,
+.reta-modal-fix * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+.reta-modal-fix input,
+.reta-modal-fix textarea,
+.reta-modal-fix select,
+.reta-modal-fix [role="textbox"] {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border: 2px solid #d4af37 !important;
+}
+
+.reta-modal-fix input:focus,
+.reta-modal-fix textarea:focus,
+.reta-modal-fix select:focus,
+.reta-modal-fix [role="textbox"]:focus {
+  background-color: #4b5563 !important;
+  border-color: #ffd700 !important;
+  color: #ffffff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.3) !important;
+}
+
+.reta-modal-fix input::placeholder,
+.reta-modal-fix textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+.reta-modal-fix label,
+.reta-modal-fix span {
+  color: #f9fafb !important;
+  font-weight: 500 !important;
+}
+
+/* Manter consistência no modo dark */
+.dark .reta-modal-fix,
+.dark .reta-modal-fix * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+.dark .reta-modal-fix input,
+.dark .reta-modal-fix textarea,
+.dark .reta-modal-fix select {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border-color: #d4af37 !important;
+}
+
+/* Harmonização global do sistema */
+.system-harmony-fix {
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%) !important;
+  border: 2px solid #d4af37 !important;
+}
+
+.system-harmony-fix:hover {
+  border-color: #ffd700 !important;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3) !important;
+}
+
+/* Botões de ações harmonizados */
+.action-button-primary {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+  color: white !important;
+  border: 1px solid #2563eb !important;
+}
+
+.action-button-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Melhorar visibilidade de inputs de data */
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"] {
+  background-color: #374151 !important;
+  border: 2px solid #d4af37 !important;
+  color: #f9fafb !important;
+}
+
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="month"]:focus {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.2) !important;
+}
+
+/* Modal Editar Jogador - harmonizado com tema escuro/dourado */
+.player-edit-modal,
+.player-edit-modal * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+.player-edit-modal input,
+.player-edit-modal select,
+.player-edit-modal textarea,
+.player-edit-modal [role="combobox"],
+.player-edit-modal [data-radix-select-content],
+.player-edit-modal [data-radix-select-trigger] {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border: 2px solid #d4af37 !important;
+}
+
+.player-edit-modal input:focus,
+.player-edit-modal select:focus,
+.player-edit-modal textarea:focus,
+.player-edit-modal [role="combobox"]:focus,
+.player-edit-modal [data-radix-select-trigger]:focus {
+  border-color: #ffd700 !important;
+  background-color: #4b5563 !important;
+  color: #ffffff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.3) !important;
+}
+
+.player-edit-modal label,
+.player-edit-modal span {
+  color: #f9fafb !important;
+  font-weight: 500 !important;
+}
+
+/* Manter consistência tema escuro/dourado no modo dark */
+.dark .player-edit-modal,
+.dark .player-edit-modal * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+.dark .player-edit-modal input,
+.dark .player-edit-modal select,
+.dark .player-edit-modal textarea,
+.dark .player-edit-modal [role="combobox"],
+.dark .player-edit-modal [data-radix-select-content],
+.dark .player-edit-modal [data-radix-select-trigger] {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border-color: #d4af37 !important;
+}
+
+/* Consistência global - inputs de data em todo sistema */
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="month"] {
+  background-color: #374151 !important;
+  border: 2px solid #d4af37 !important;
+  color: #f9fafb !important;
+}
+
+/* Notificações - contraste adequado para todos os temas */
+.notification-light,
+.notification-light * {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+
+.notification-light .notification-title,
+.notification-light h4,
+.notification-light .font-medium {
+  color: #0f172a !important;
+}
+
+.notification-light .notification-description,
+.notification-light .text-muted-foreground,
+.notification-light p {
+  color: #475569 !important;
+}
+
+.notification-light:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* Notificações não lidas - destaque adequado */
+.bg-blue-50 {
+  background-color: #dbeafe !important;
+  color: #1e3a8a !important;
+}
+
+.dark\:bg-blue-900\/20 {
+  background-color: #dbeafe !important;
+  color: #1e3a8a !important;
+}
+
+/* Forçar contraste adequado no modo dark também */
+.dark .notification-light,
+.dark .notification-light * {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+.dark .bg-blue-50,
+.dark .dark\:bg-blue-900\/20 {
+  background-color: #dbeafe !important;
+  color: #1e3a8a !important;
+}
+
+/* Preview de Relatórios - texto legível em todos os temas */
+.report-preview,
+.report-preview * {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.report-preview .text-gray-600,
+.report-preview .text-muted-foreground,
+.report-preview .text-foreground {
+  color: #4b5563 !important;
+}
+
+.report-preview label,
+.report-preview p,
+.report-preview span,
+.report-preview div {
+  color: #1a1a1a !important;
+}
+
+.report-preview .text-sm {
+  color: #374151 !important;
+}
+
+/* Forçar tema claro no modo dark também */
+.dark .report-preview,
+.dark .report-preview * {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.dark .report-preview .text-gray-600,
+.dark .report-preview .text-muted-foreground,
+.dark .report-preview .text-foreground {
+  color: #4b5563 !important;
+}
+
+/* Botões Cancelar sempre visíveis */
+.cancel-button-fix {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+.cancel-button-fix:hover {
+  background-color: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+/* Modal Verificar Perfil - Layout organizado */
+.verify-profile-modal {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.verify-profile-modal .DialogHeader {
+  border-bottom: 1px solid #e5e7eb !important;
+  padding-bottom: 1rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.verify-profile-modal .TabsList {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.verify-profile-modal .TabsTrigger {
+  color: #64748b !important;
+}
+
+.verify-profile-modal .TabsTrigger[data-state="active"] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.verify-profile-modal .Card {
+  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+}
+
+.verify-profile-modal .CardContent {
+  padding: 1rem !important;
+}
+
+/* Forçar tema claro no modo dark também */
+.dark .verify-profile-modal {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.dark .verify-profile-modal .Card {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Dropdown/Select menus legíveis */
+.dropdown-content-fix {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #e5e7eb !important;
+}
+
+.dropdown-content-fix [role="option"]:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.dropdown-content-fix [role="option"][data-highlighted] {
+  background-color: #e5e7eb !important;
+}
+
+/* Filtros de período legíveis */
+.period-filter-fix {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.period-filter-fix button {
+  color: #374151 !important;
+}
+
+.period-filter-fix button:hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Modal de Snapshot Mensal - harmonizado com tema escuro/dourado */
+.snapshot-modal-fix,
+.snapshot-modal-fix * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+.snapshot-modal-fix input,
+.snapshot-modal-fix textarea,
+.snapshot-modal-fix select,
+.snapshot-modal-fix [role="combobox"],
+.snapshot-modal-fix [data-radix-select-content],
+.snapshot-modal-fix [data-radix-select-trigger] {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border: 2px solid #d4af37 !important;
+}
+
+.snapshot-modal-fix input:focus,
+.snapshot-modal-fix textarea:focus,
+.snapshot-modal-fix select:focus,
+.snapshot-modal-fix [role="combobox"]:focus,
+.snapshot-modal-fix [data-radix-select-trigger]:focus {
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  color: #1a1a1a !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+}
+
+.snapshot-modal-fix input::placeholder,
+.snapshot-modal-fix textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+.snapshot-modal-fix label,
+.snapshot-modal-fix span {
+  color: #1a1a1a !important;
+}
+
+/* Forçar tema claro no modo dark também */
+.dark .snapshot-modal-fix,
+.dark .snapshot-modal-fix * {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.dark .snapshot-modal-fix input,
+.dark .snapshot-modal-fix textarea,
+.dark .snapshot-modal-fix select,
+.dark .snapshot-modal-fix [role="combobox"] {
+  background-color: #f9fafb !important;
+  color: #1a1a1a !important;
+  border-color: #e5e7eb !important;
+}
+
+/* Inputs de data/período legíveis */
+.date-filter-fix,
+.date-filter-fix * {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+.date-filter-fix input[type="date"],
+.date-filter-fix input[type="datetime-local"],
+.date-filter-fix input[type="month"],
+.date-filter-fix .react-datepicker-wrapper,
+.date-filter-fix .react-datepicker__input-container input {
+  background-color: #f9fafb !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.date-filter-fix input:focus {
+  background-color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Checkbox personalizado */
+.checkbox-fix {
+  accent-color: #3b82f6 !important;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.checkbox-fix:checked {
+  background-color: #3b82f6 !important;
+}
+
+/* Select/Dropdown fix geral */
+.select-fix,
+.select-fix [data-radix-select-content],
+.select-fix [data-radix-select-trigger],
+.select-fix [data-radix-select-viewport] {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-color: #e5e7eb !important;
+}
+
+.select-fix [data-radix-select-item] {
+  color: #1a1a1a !important;
+}
+
+.select-fix [data-radix-select-item]:hover,
+.select-fix [data-radix-select-item][data-highlighted] {
+  background-color: #f3f4f6 !important;
+  color: #1a1a1a !important;
+}
+
+/* Dashboard de Retas - cores harmonizadas com tema */
+.period-filter-fix,
+.period-filter-fix * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+  border-color: #d4af37 !important;
+}
+
+.period-filter-fix [data-radix-select-trigger] {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border: 2px solid #d4af37 !important;
+}
+
+.period-filter-fix [data-radix-select-trigger]:hover {
+  background-color: #4b5563 !important;
+  border-color: #ffd700 !important;
+}
+
+.dropdown-content-fix,
+.dropdown-content-fix * {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+  border: 2px solid #d4af37 !important;
+}
+
+.dropdown-content-fix [data-radix-select-item] {
+  color: #f9fafb !important;
+  background-color: #1f2937 !important;
+}
+
+.dropdown-content-fix [data-radix-select-item]:hover,
+.dropdown-content-fix [data-radix-select-item][data-highlighted] {
+  background-color: #374151 !important;
+  color: #ffd700 !important;
+}
+
+/* Força tema claro no modo dark */
+.dark .period-filter-fix,
+.dark .period-filter-fix *,
+.dark .dropdown-content-fix,
+.dark .dropdown-content-fix * {
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+}
+
+/* Dashboard de Retas - text visível */
+.reta-dashboard-fix,
+.reta-dashboard-fix * {
+  color: #1a1a1a !important;
+}
+
+.reta-dashboard-fix .text-muted-foreground {
+  color: #6b7280 !important;
+}
+
+.dark .reta-dashboard-fix,
+.dark .reta-dashboard-fix * {
+  color: #1a1a1a !important;
+}
+
+.dark .reta-dashboard-fix .text-muted-foreground {
+  color: #6b7280 !important;
+}

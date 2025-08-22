@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "name": "pokerstars",
+    "display_name": "PokerStars",
+    "is_active": true
+  },
+  {
+    "id": 2,
+    "name": "gg",
+    "display_name": "GGPoker",
+    "is_active": true
+  },
+  {
+    "id": 3,
+    "name": "luxon",
+    "display_name": "Luxon",
+    "is_active": true
+  }
+]

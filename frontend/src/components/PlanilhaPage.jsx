@@ -3,6 +3,7 @@ import Planilha from "./Planilha";
 import { useSSE } from "../hooks/useSSE";
 import ReloadRequestModal from "./ReloadRequestModal";
 import WithdrawalRequestModal from "./WithdrawalRequestModal";
+import TeamMonthlySnapshots from "./TeamMonthlySnapshots";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DollarSign,
   TrendingUp,
@@ -22,6 +24,7 @@ import {
   Clock,
   Eye,
   Info,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatUSD } from "@/lib/utils";
@@ -45,6 +48,7 @@ const PlanilhaPage = ({ user }) => {
   const [showReloadModal, setShowReloadModal] = useState(false);
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [activeTab, setActiveTab] = useState("overview");
   const [teamData, setTeamData] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -72,6 +76,21 @@ const PlanilhaPage = ({ user }) => {
       }
     }
   }, [isAdminOrManager, teamData]);
+
+  // Detectar foco em solicitações para scroll automático
+  useEffect(() => {
+    const focus = sessionStorage.getItem("planilhaFocus");
+    if (focus === "solicitacoes" && selectedPlayer) {
+      sessionStorage.removeItem("planilhaFocus");
+      // Scroll para a seção de solicitações após 500ms (aguarda renderização)
+      setTimeout(() => {
+        const element = document.getElementById("solicitacoes-section");
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 500);
+    }
+  }, [selectedPlayer]);
 
   const fetchTeamData = useCallback(async () => {
     setLoading(true);
@@ -183,8 +202,9 @@ const PlanilhaPage = ({ user }) => {
         {/* Header Admin/Manager */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold gradient-gold-text">
-              📊 Gestão Financeira do Time
+            <h1 className="text-3xl font-bold gradient-gold-text flex items-center gap-2 fade-in">
+              <BarChart3 className="w-8 h-8 text-primary" />
+              Gestão Financeira do Time
             </h1>
             <p className="text-muted-foreground">
               Dashboard completo de entradas, saídas, lucros e gastos da equipe
@@ -201,268 +221,292 @@ const PlanilhaPage = ({ user }) => {
           )}
         </div>
 
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-muted-foreground mt-2">
-              Carregando dados do time...
-            </p>
-          </div>
-        ) : selectedPlayer ? (
-          // Visão individual do jogador para admin
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <img
-                    src="/LOGO_NOVO.png"
-                    alt="Invictus"
-                    className="w-6 h-6 object-contain"
-                  />
-                  <span>Planilha de {selectedPlayer.full_name}</span>
-                </CardTitle>
-                <CardDescription>
-                  Dados completos e histórico do jogador
-                </CardDescription>
-              </CardHeader>
-            </Card>
+        {/* Abas de Navegação */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="overview">📊 Visão Geral</TabsTrigger>
+            <TabsTrigger value="monthly">📅 Controle Mensal</TabsTrigger>
+          </TabsList>
 
-            <Planilha
-              key={`${refreshKey}-${selectedPlayer.id}`}
-              userId={selectedPlayer.id}
-              userRole={user.role}
-              onRequestReload={handleRequestReload}
-              onRequestWithdrawal={handleRequestWithdrawal}
-              isManagingOtherUser={true}
-            />
-          </div>
-        ) : (
-          // Dashboard geral do time
-          <div className="space-y-6">
-            {/* Cards de Estatísticas Financeiras */}
-            {teamData && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <TabsContent value="overview" className="mt-6">
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-2">
+                  Carregando dados do time...
+                </p>
+              </div>
+            ) : selectedPlayer ? (
+              // Visão individual do jogador para admin
+              <div className="space-y-6">
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Saldo Total do Time
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <img
+                        src="/LOGO_NOVO.png"
+                        alt="Invictus"
+                        className="w-6 h-6 object-contain"
+                      />
+                      <span>Planilha de {selectedPlayer.full_name}</span>
                     </CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <CardDescription>
+                      Dados completos e histórico do jogador
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-400">
-                      $ {teamData.totalBalance?.toFixed(2) || "0.00"}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Soma de todas as contas
-                    </p>
-                  </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Lucro Mensal
-                    </CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className={`text-2xl font-bold ${
-                        (teamData.monthlyProfit || 0) >= 0
-                          ? "text-green-400"
-                          : "text-red-400"
-                      }`}
-                    >
-                      $ {teamData.monthlyProfit?.toFixed(2) || "0.00"}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Resultado dos últimos 30 dias (alinhado ao gráfico)
-                    </p>
-                  </CardContent>
-                </Card>
+                <Planilha
+                  key={`${refreshKey}-${selectedPlayer.id}`}
+                  userId={selectedPlayer.id}
+                  userRole={user.role}
+                  onRequestReload={handleRequestReload}
+                  onRequestWithdrawal={handleRequestWithdrawal}
+                  isManagingOtherUser={true}
+                />
+              </div>
+            ) : (
+              // Dashboard geral do time
+              <div className="space-y-6">
+                {/* Cards de Estatísticas Financeiras */}
+                {teamData && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Saldo Total do Time
+                        </CardTitle>
+                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-400">
+                          $ {teamData.totalBalance?.toFixed(2) || "0.00"}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Soma de todas as contas
+                        </p>
+                      </CardContent>
+                    </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Reloads Pendentes
-                    </CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-yellow-400">
-                      {teamData.pendingReloads || 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Aguardando aprovação
-                    </p>
-                  </CardContent>
-                </Card>
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Lucro Mensal
+                        </CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div
+                          className={`text-2xl font-bold ${
+                            (teamData.monthlyProfit || 0) >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          $ {teamData.monthlyProfit?.toFixed(2) || "0.00"}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Resultado dos últimos 30 dias (alinhado ao gráfico)
+                        </p>
+                      </CardContent>
+                    </Card>
 
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Reloads Pendentes
+                        </CardTitle>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-yellow-400">
+                          {teamData.pendingReloads || 0}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Aguardando aprovação
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Jogadores Ativos
+                        </CardTitle>
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-blue-400">
+                          {teamData.activePlayers || 0}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Com contas ativas
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* Central de Pendências e Solicitações */}
+                {playerStats.total > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">
+                        ⚠️ Pendências e Solicitações
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-500">
+                            {playerStats.complete}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Completos
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-yellow-500">
+                            {playerStats.pending}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Pendentes
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-red-500">
+                            {playerStats.critical}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Críticos
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold invictus-gold">
+                            {playerStats.total}
+                          </div>
+                          <p className="text-sm text-muted-foreground">Total</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Lista de Jogadores */}
                 <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Jogadores Ativos
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <img
+                        src="/LOGO_NOVO.png"
+                        alt="Invictus"
+                        className="w-6 h-6 object-contain"
+                      />
+                      <span>Jogadores do Time</span>
+                      {playerStats.critical > 0 && (
+                        <Badge variant="destructive" className="ml-2">
+                          {playerStats.critical} requer atenção
+                        </Badge>
+                      )}
                     </CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <CardDescription>
+                      Clique em um jogador para ver detalhes completos de sua
+                      planilha
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-400">
-                      {teamData.activePlayers || 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Com contas ativas
-                    </p>
+                    {playersWithStatus?.length > 0 ? (
+                      <div className="space-y-3">
+                        {playersWithStatus.map((player) => (
+                          <TooltipProvider key={player.id}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div
+                                  className={`${getPlayerStatusClasses(
+                                    player.computedStatus
+                                  )} cursor-pointer hover:scale-[1.02] transition-transform`}
+                                  onClick={() => handleViewPlayer(player)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="flex items-center space-x-2">
+                                        {getStatusIndicator(
+                                          player.computedStatus
+                                        )}
+                                        <span
+                                          className={`player-name ${
+                                            player.computedStatus === "critical"
+                                              ? "font-bold"
+                                              : "font-medium"
+                                          }`}
+                                        >
+                                          {player.full_name}
+                                        </span>
+                                      </div>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        @{player.username}
+                                      </Badge>
+                                      {getStatusBadge(player.computedStatus, {
+                                        className: "text-xs",
+                                      })}
+                                    </div>
+                                    <div className="flex items-center justify-between flex-1">
+                                      <div className="flex items-center space-x-2">
+                                        {player.pendingCount > 0 && (
+                                          <Badge
+                                            variant="destructive"
+                                            className="text-xs"
+                                          >
+                                            {player.pendingCount} pendência(s)
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center space-x-4">
+                                        <div className="text-right">
+                                          <p className="text-sm font-medium text-green-400">
+                                            {formatUSD(
+                                              player.totalBalance || 0
+                                            )}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {player.accountCount || 0} conta(s)
+                                          </p>
+                                        </div>
+                                        <Button variant="outline" size="sm">
+                                          <Eye className="w-4 h-4 mr-1" />
+                                          Ver Planilha
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-sm max-w-xs">
+                                  {player.statusMessage}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="w-12 h-12 mx-auto mb-4" />
+                        <p>Nenhum jogador encontrado</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
             )}
+          </TabsContent>
 
-            {/* Estatísticas de Status dos Jogadores */}
-            {playerStats.total > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">
-                    Status dos Jogadores
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-500">
-                        {playerStats.complete}
-                      </div>
-                      <p className="text-sm text-muted-foreground">Completos</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-500">
-                        {playerStats.pending}
-                      </div>
-                      <p className="text-sm text-muted-foreground">Pendentes</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-red-500">
-                        {playerStats.critical}
-                      </div>
-                      <p className="text-sm text-muted-foreground">Críticos</p>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold invictus-gold">
-                        {playerStats.total}
-                      </div>
-                      <p className="text-sm text-muted-foreground">Total</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Lista de Jogadores */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <img
-                    src="/LOGO_NOVO.png"
-                    alt="Invictus"
-                    className="w-6 h-6 object-contain"
-                  />
-                  <span>Jogadores do Time</span>
-                  {playerStats.critical > 0 && (
-                    <Badge variant="destructive" className="ml-2">
-                      {playerStats.critical} requer atenção
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  Clique em um jogador para ver detalhes completos de sua
-                  planilha. Cores indicam status:
-                  <span className="text-green-500 ml-1">Verde (OK)</span>,
-                  <span className="text-yellow-500 ml-1">
-                    Amarelo (Pendente)
-                  </span>
-                  ,<span className="text-red-500 ml-1">Vermelho (Crítico)</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {playersWithStatus?.length > 0 ? (
-                  <div className="space-y-3">
-                    {playersWithStatus.map((player) => (
-                      <TooltipProvider key={player.id}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div
-                              className={`${getPlayerStatusClasses(
-                                player.computedStatus
-                              )} cursor-pointer hover:scale-[1.02] transition-transform`}
-                              onClick={() => handleViewPlayer(player)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                  <div className="flex items-center space-x-2">
-                                    {getStatusIndicator(player.computedStatus)}
-                                    <span
-                                      className={`player-name ${
-                                        player.computedStatus === "critical"
-                                          ? "font-bold"
-                                          : "font-medium"
-                                      }`}
-                                    >
-                                      {player.full_name}
-                                    </span>
-                                  </div>
-                                  <Badge variant="outline" className="text-xs">
-                                    @{player.username}
-                                  </Badge>
-                                  {getStatusBadge(player.computedStatus, {
-                                    className: "text-xs",
-                                  })}
-                                </div>
-                                <div className="flex items-center space-x-4">
-                                  <div className="text-right">
-                                    <p className="text-sm font-medium text-green-400">
-                                      ${" "}
-                                      {player.totalBalance?.toFixed(2) ||
-                                        "0.00"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {player.accountCount || 0} conta(s)
-                                    </p>
-                                  </div>
-                                  {player.pendingCount > 0 && (
-                                    <Badge
-                                      variant="destructive"
-                                      className="text-xs"
-                                    >
-                                      {player.pendingCount} pendência(s)
-                                    </Badge>
-                                  )}
-                                  <Button variant="outline" size="sm">
-                                    <Eye className="w-4 h-4 mr-1" />
-                                    Ver Planilha
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-sm max-w-xs">
-                              {player.statusMessage}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Users className="w-12 h-12 mx-auto mb-4" />
-                    <p>Nenhum jogador encontrado</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+          <TabsContent value="monthly" className="mt-6">
+            <TeamMonthlySnapshots user={user} />
+          </TabsContent>
+        </Tabs>
       </div>
     );
   }
@@ -484,7 +528,7 @@ const PlanilhaPage = ({ user }) => {
 
       {/* Componente principal da planilha */}
       <Planilha
-        key={refreshKey} // Força re-render quando refreshKey muda
+        key={refreshKey}
         userId={user.id}
         userRole={user.role}
         onRequestReload={handleRequestReload}

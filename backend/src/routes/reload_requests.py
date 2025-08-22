@@ -3,6 +3,13 @@ from datetime import datetime
 from src.models.models import db, ReloadRequest, User, Platform, Account, Transaction, UserRole, ReloadStatus, TransactionType
 from src.routes.auth import login_required, admin_required
 from src.utils.notification_service import get_notification_service
+from src.middleware.audit_middleware import audit_reload_approval
+from src.utils.pagination import paginate_query
+from src.middleware.csrf_protection import csrf_protect
+from src.routes.sse import notify_reload_approved, notify_reload_created, broadcast_to_user
+from src.services.reloads import ReloadService, ApproveReloadDTO, RejectReloadDTO
+from src.schemas.reloads import ApproveReloadSchema, RejectReloadSchema
+import bleach
 
 reload_requests_bp = Blueprint('reload_requests', __name__)
 
@@ -37,13 +44,19 @@ def get_reload_requests():
             except ValueError:
                 return jsonify({'error': 'Invalid status'}), 400
         
-        reload_requests = query.order_by(ReloadRequest.created_at.desc()).all()
-        return jsonify({'reload_requests': [req.to_dict() for req in reload_requests]}), 200
+        # Paginação
+        query = query.order_by(ReloadRequest.created_at.desc())
+        result = paginate_query(query, max_per_page=200)
+        return jsonify({
+            'reload_requests': [req.to_dict() for req in result['items']],
+            'pagination': result['pagination']
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @reload_requests_bp.route('/', methods=['POST'])
 @login_required
+@csrf_protect
 def create_reload_request():
     try:
         current_user = User.query.get(session['user_id'])
@@ -132,6 +145,8 @@ def get_reload_request(request_id):
 
 @reload_requests_bp.route('/<int:request_id>/approve', methods=['POST'])
 @admin_required
+@csrf_protect
+@audit_reload_approval
 def approve_reload_request(request_id):
     try:
         current_user = User.query.get(session['user_id'])
@@ -143,46 +158,28 @@ def approve_reload_request(request_id):
         if reload_request.status != ReloadStatus.PENDING:
             return jsonify({'error': 'Request is not pending'}), 400
         
-        data = request.get_json() or {}
-        manager_notes = data.get('manager_notes', '')
-        
-        # Atualizar a solicitação
-        reload_request.status = ReloadStatus.APPROVED
-        reload_request.manager_notes = manager_notes
-        reload_request.approved_by = current_user.id
-        reload_request.approved_at = datetime.utcnow()
-        
-        # Atualizar o saldo da conta
-        account = Account.query.filter_by(
-            user_id=reload_request.user_id,
-            platform_id=reload_request.platform_id
-        ).first()
-        
-        if account:
-            account.current_balance += reload_request.amount
-            account.total_reloads += reload_request.amount
-        
-        # Criar transação
-        transaction = Transaction(
-            user_id=reload_request.user_id,
-            platform_id=reload_request.platform_id,
-            transaction_type=TransactionType.RELOAD,
-            amount=reload_request.amount,
-            description=f'Reload aprovado - Solicitação #{reload_request.id}',
-            reload_request_id=reload_request.id,
-            created_by=current_user.id
-        )
-        
-        db.session.add(transaction)
-        db.session.commit()
+        payload = ApproveReloadSchema().load(request.get_json() or {})
+        notes = bleach.clean(payload.get('manager_notes', ''), tags=[], strip=True)
+        req = ReloadService.approve(ApproveReloadDTO(
+            reload_id=request_id,
+            manager_id=current_user.id,
+            manager_notes=notes
+        ))
         
         # Enviar notificações automáticas
         notification_service = get_notification_service()
         notification_service.notify_reload_request(reload_request, action="approved")
         
+        # Notificar via SSE
+        try:
+            notify_reload_approved(req)
+        except Exception as e:
+            # Não falhar se SSE não funcionar
+            pass
+        
         return jsonify({
             'message': 'Reload request approved successfully',
-            'reload_request': reload_request.to_dict()
+            'reload_request': req.to_dict()
         }), 200
     except Exception as e:
         db.session.rollback()
@@ -190,6 +187,8 @@ def approve_reload_request(request_id):
 
 @reload_requests_bp.route('/<int:request_id>/reject', methods=['POST'])
 @admin_required
+@csrf_protect
+@audit_reload_approval
 def reject_reload_request(request_id):
     try:
         current_user = User.query.get(session['user_id'])
@@ -201,19 +200,23 @@ def reject_reload_request(request_id):
         if reload_request.status != ReloadStatus.PENDING:
             return jsonify({'error': 'Request is not pending'}), 400
         
-        data = request.get_json() or {}
-        manager_notes = data.get('manager_notes', '')
+        payload = RejectReloadSchema().load(request.get_json() or {})
+        manager_notes = bleach.clean(payload['manager_notes'], tags=[], strip=True)
         
         if not manager_notes:
             return jsonify({'error': 'Manager notes are required for rejection'}), 400
         
-        # Atualizar a solicitação
-        reload_request.status = ReloadStatus.REJECTED
-        reload_request.manager_notes = manager_notes
-        reload_request.approved_by = current_user.id
-        reload_request.approved_at = datetime.utcnow()
-        
-        db.session.commit()
+        req = ReloadService.reject(RejectReloadDTO(
+            reload_id=request_id,
+            manager_id=current_user.id,
+            manager_notes=manager_notes
+        ))
+        broadcast_to_user(req.user_id, 'reload_status', {
+            'id': req.id,
+            'status': 'rejected',
+            'message': 'Sua solicitação de reload foi rejeitada',
+            'timestamp': datetime.utcnow().timestamp()
+        })
         
         # Enviar notificações automáticas
         notification_service = get_notification_service()
@@ -221,7 +224,7 @@ def reject_reload_request(request_id):
         
         return jsonify({
             'message': 'Reload request rejected successfully',
-            'reload_request': reload_request.to_dict()
+            'reload_request': req.to_dict()
         }), 200
     except Exception as e:
         db.session.rollback()
@@ -229,6 +232,7 @@ def reject_reload_request(request_id):
 
 @reload_requests_bp.route('/<int:request_id>', methods=['PUT'])
 @login_required
+@csrf_protect
 def update_reload_request(request_id):
     try:
         current_user = User.query.get(session['user_id'])
@@ -277,6 +281,7 @@ def update_reload_request(request_id):
 
 @reload_requests_bp.route('/<int:request_id>', methods=['DELETE'])
 @login_required
+@csrf_protect
 def delete_reload_request(request_id):
     try:
         current_user = User.query.get(session['user_id'])

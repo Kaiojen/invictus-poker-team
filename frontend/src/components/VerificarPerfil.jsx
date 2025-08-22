@@ -64,6 +64,7 @@ import { toast } from "sonner";
 import PlatformAccountsView from "./PlatformAccountsView";
 import BankrollChart from "./BankrollChart";
 import CalendarTracker from "./CalendarTracker";
+import AdminPlayerProfile from "./AdminPlayerProfile";
 
 const VerificarPerfil = ({ userRole }) => {
   const [players, setPlayers] = useState([]);
@@ -75,6 +76,8 @@ const VerificarPerfil = ({ userRole }) => {
   const [calendarData, setCalendarData] = useState([]);
   const [platforms, setPlatforms] = useState([]);
   const [permissions, setPermissions] = useState([]);
+  const [showAdminProfile, setShowAdminProfile] = useState(false);
+  const [selectedPlayerForAdmin, setSelectedPlayerForAdmin] = useState(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -188,9 +191,11 @@ const VerificarPerfil = ({ userRole }) => {
   };
 
   const getPlayerStatus = (player) => {
-    if (player.makeup > 0) return "critical";
-    if (player.total_balance > 0) return "profit";
-    return "even";
+    // P&L baseado: negativo = crítico, positivo = lucro, zero = neutro
+    const pnl = (player.total_balance || 0) - (player.total_investment || 0);
+    if (pnl < 0) return "critical"; // Prejuízo (P)
+    if (pnl > 0) return "profit"; // Lucro (L)
+    return "even"; // Neutro
   };
 
   const formatCurrency = (value) => {
@@ -322,9 +327,9 @@ const VerificarPerfil = ({ userRole }) => {
                         <AlertTriangle className="w-3 h-3 mr-1" />
                       )}
                       {getPlayerStatus(player) === "profit"
-                        ? "Lucro"
+                        ? "Lucro (L)"
                         : getPlayerStatus(player) === "critical"
-                        ? "Makeup"
+                        ? "Prejuízo (P)"
                         : "Neutro"}
                     </Badge>
                   </TableCell>
@@ -341,14 +346,28 @@ const VerificarPerfil = ({ userRole }) => {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePlayerSelect(player)}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Ver Perfil
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePlayerSelect(player)}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver Perfil
+                      </Button>
+                      {userRole === "admin" && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPlayerForAdmin(player);
+                            setShowAdminProfile(true);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          👑 Admin
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -357,140 +376,300 @@ const VerificarPerfil = ({ userRole }) => {
         </CardContent>
       </Card>
 
-      {/* Modal de Detalhes */}
+      {/* Modal de Detalhes - Layout Limpo */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Perfil de {selectedPlayer?.full_name}
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden verify-profile-modal">
+          <DialogHeader className="pb-6 border-b border-border">
+            <DialogTitle className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <Users className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold gradient-gold-text">
+                  {selectedPlayer?.full_name}
+                </h3>
+                <div className="flex items-center gap-3 mt-2">
+                  <p className="text-sm text-muted-foreground">
+                    @{selectedPlayer?.username}
+                  </p>
+                  <div className="w-1 h-1 rounded-full bg-muted-foreground"></div>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedPlayer?.email}
+                  </p>
+                </div>
+              </div>
             </DialogTitle>
-            <DialogDescription>
-              Informações detalhadas e histórico do jogador
-            </DialogDescription>
           </DialogHeader>
 
           {selectedPlayer && (
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="overview">📊 Visão Geral</TabsTrigger>
-                <TabsTrigger value="personal">👤 Dados Completos</TabsTrigger>
-                <TabsTrigger value="accounts">
-                  💰 Contas por Plataforma
-                </TabsTrigger>
-                <TabsTrigger value="evolution">📈 Evolução</TabsTrigger>
-                <TabsTrigger value="permissions">🛡️ Permissões</TabsTrigger>
-              </TabsList>
+            <div className="flex-1 overflow-hidden">
+              <Tabs defaultValue="overview" className="h-full flex flex-col">
+                <TabsList className="grid w-full grid-cols-4 mb-8 bg-muted/50">
+                  <TabsTrigger
+                    value="overview"
+                    className="flex items-center gap-2"
+                  >
+                    <span>📊</span>
+                    <span className="hidden sm:inline">Visão Geral</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="accounts"
+                    className="flex items-center gap-2"
+                  >
+                    <span>💰</span>
+                    <span className="hidden sm:inline">Contas</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="evolution"
+                    className="flex items-center gap-2"
+                  >
+                    <span>📈</span>
+                    <span className="hidden sm:inline">Evolução</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="personal"
+                    className="flex items-center gap-2"
+                  >
+                    <span>👤</span>
+                    <span className="hidden sm:inline">Dados</span>
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="overview" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">Dados Pessoais</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <strong>Nome:</strong> {selectedPlayer.full_name}
-                      </div>
-                      <div>
-                        <strong>Username:</strong> @{selectedPlayer.username}
-                      </div>
-                      <div>
-                        <strong>Email:</strong> {selectedPlayer.email}
-                      </div>
-                      <div>
-                        <strong>Contas Ativas:</strong>{" "}
-                        {selectedPlayer.account_count}
-                      </div>
-                    </CardContent>
-                  </Card>
+                <div className="flex-1 overflow-y-auto space-y-6">
+                  <TabsContent value="overview" className="mt-0 space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      <Card className="h-fit">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="text-lg flex items-center gap-2 gradient-gold-text">
+                            <span>👤</span>
+                            Informações Básicas
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 p-4">
+                          <div className="space-y-4">
+                            <div className="flex flex-col space-y-2 border-b border-border pb-3">
+                              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                                Nome Completo
+                              </span>
+                              <span className="text-sm font-semibold text-foreground break-words">
+                                {selectedPlayer.full_name}
+                              </span>
+                            </div>
+                            <div className="flex flex-col space-y-2 border-b border-border pb-3">
+                              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                                Username
+                              </span>
+                              <span className="text-sm font-semibold text-primary">
+                                @{selectedPlayer.username}
+                              </span>
+                            </div>
+                            <div className="flex flex-col space-y-2">
+                              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                                Email
+                              </span>
+                              <span className="text-sm font-medium text-foreground break-all">
+                                {selectedPlayer.email}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-sm">
-                        Status Financeiro
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <strong>Saldo Total:</strong>
-                        <span
-                          className={getStatusColor(
-                            getPlayerStatus(selectedPlayer)
-                          )}
-                        >
-                          {formatCurrency(selectedPlayer.total_balance)}
-                        </span>
-                      </div>
-                      <div>
-                        <strong>Makeup:</strong>
-                        <span
-                          className={
-                            selectedPlayer.makeup > 0
-                              ? "text-red-400"
-                              : "text-green-400"
-                          }
-                        >
-                          {formatCurrency(selectedPlayer.makeup)}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </TabsContent>
+                      <Card className="h-fit">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="text-lg flex items-center gap-2 gradient-gold-text">
+                            <span>💰</span>
+                            Status Financeiro
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6 p-4">
+                          <div className="space-y-4">
+                            <div className="bg-gradient-to-r from-green-900/30 to-green-800/30 p-6 rounded-lg border border-green-500/30">
+                              <div className="text-center space-y-2">
+                                <p className="text-xs text-green-300 font-medium mb-3 uppercase tracking-wide">
+                                  💳 Saldo Total
+                                </p>
+                                <p className="text-3xl font-bold text-green-400 tracking-tight">
+                                  {formatCurrency(selectedPlayer.total_balance)}
+                                </p>
+                              </div>
+                            </div>
+                            <div
+                              className={`p-6 rounded-lg border ${
+                                (selectedPlayer.total_balance || 0) -
+                                  (selectedPlayer.total_investment || 0) >=
+                                0
+                                  ? "bg-gradient-to-r from-green-900/30 to-green-800/30 border-green-500/30"
+                                  : "bg-gradient-to-r from-red-900/30 to-red-800/30 border-red-500/30"
+                              }`}
+                            >
+                              <div className="text-center space-y-2">
+                                <p
+                                  className={`text-xs font-medium mb-3 uppercase tracking-wide ${
+                                    (selectedPlayer.total_balance || 0) -
+                                      (selectedPlayer.total_investment || 0) >=
+                                    0
+                                      ? "text-green-300"
+                                      : "text-red-300"
+                                  }`}
+                                >
+                                  📈 P&L Total
+                                </p>
+                                <p
+                                  className={`text-3xl font-bold tracking-tight ${
+                                    (selectedPlayer.total_balance || 0) -
+                                      (selectedPlayer.total_investment || 0) >=
+                                    0
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}
+                                >
+                                  {formatCurrency(
+                                    (selectedPlayer.total_balance || 0) -
+                                      (selectedPlayer.total_investment || 0)
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
 
-              <TabsContent value="accounts" className="space-y-4">
-                <PlatformAccountsView playerId={selectedPlayer.id} />
-              </TabsContent>
+                      <Card className="h-fit">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="text-lg flex items-center gap-2 gradient-gold-text">
+                            <span>📊</span>
+                            Estatísticas
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="space-y-4">
+                            <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/30 p-4 rounded-lg border border-blue-500/30">
+                              <div className="flex flex-col space-y-2">
+                                <span className="text-xs text-blue-300 font-medium">
+                                  🏦 Contas Ativas:
+                                </span>
+                                <span className="text-2xl font-bold text-blue-400">
+                                  {selectedPlayer.account_count || 0}
+                                </span>
+                              </div>
+                            </div>
 
-              <TabsContent value="evolution" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <BankrollChart playerId={selectedPlayer.id} />
-                  <CalendarTracker playerId={selectedPlayer.id} />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="personal" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>👤 Dados Pessoais e Bancários</CardTitle>
-                    <CardDescription>
-                      Formulário completo com todos os dados obrigatórios do
-                      jogador
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <PlanilhaCompleta
-                      userId={selectedPlayer.id}
-                      userRole={userRole}
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="permissions" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>🛡️ Permissões Especiais</span>
-                      <Button size="sm">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Nova Permissão
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Shield className="w-12 h-12 mx-auto mb-4" />
-                      <p>Sistema de permissões será implementado</p>
+                            <div className="bg-gradient-to-r from-purple-900/30 to-purple-800/30 p-4 rounded-lg border border-purple-500/30">
+                              <div className="flex flex-col space-y-2">
+                                <span className="text-xs text-purple-300 font-medium">
+                                  📊 Status:
+                                </span>
+                                <Badge
+                                  className={`w-fit ${getStatusColor(
+                                    getPlayerStatus(selectedPlayer)
+                                  )}`}
+                                >
+                                  {getPlayerStatus(selectedPlayer) === "profit"
+                                    ? "✅ Lucro (L)"
+                                    : getPlayerStatus(selectedPlayer) ===
+                                      "critical"
+                                    ? "❌ Prejuízo (P)"
+                                    : "⚪ Neutro"}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                  </TabsContent>
+
+                  <TabsContent value="accounts" className="mt-0 space-y-6">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <span>💰</span>
+                          Contas por Plataforma
+                        </CardTitle>
+                        <CardDescription>
+                          Detalhes das contas em cada plataforma de poker
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <PlatformAccountsView playerId={selectedPlayer.id} />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="evolution" className="mt-0 space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <span>📈</span>
+                            Evolução do Bankroll
+                          </CardTitle>
+                          <CardDescription>
+                            Histórico de 30 dias
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <BankrollChart playerId={selectedPlayer.id} />
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <span>📅</span>
+                            Calendário de Atividade
+                          </CardTitle>
+                          <CardDescription>
+                            Preenchimento da planilha
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <CalendarTracker playerId={selectedPlayer.id} />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="personal" className="mt-0 space-y-6">
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <span>👤</span>
+                          Dados Pessoais e Bancários
+                        </CardTitle>
+                        <CardDescription>
+                          Informações completas do perfil do jogador
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="max-h-96 overflow-y-auto">
+                        <PlanilhaCompleta
+                          userId={selectedPlayer.id}
+                          userRole={userRole}
+                        />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* 🚨 NOVO: Modal Admin Completo */}
+      <AdminPlayerProfile
+        player={selectedPlayerForAdmin}
+        isOpen={showAdminProfile}
+        onClose={() => {
+          setShowAdminProfile(false);
+          setSelectedPlayerForAdmin(null);
+        }}
+        onSave={() => {
+          fetchPlayers(); // Refresh list after saving
+          toast.success("Dados atualizados com sucesso!");
+        }}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, make_response
 from src.models.models import db, AuditLog, User, UserRole
 from src.routes.auth import login_required, admin_required
 from datetime import datetime, timedelta
@@ -229,52 +229,92 @@ def log_action(user_id, action, entity_type, entity_id, old_values=None, new_val
 @audit_bp.route('/export', methods=['GET'])
 @admin_required
 def export_audit_logs():
-    """Exportar logs de auditoria em CSV"""
+    """Exportar logs de auditoria em CSV ou PDF"""
     try:
         days_back = request.args.get('days_back', 30, type=int)
+        format_type = request.args.get('format', 'csv').lower()
         start_date = datetime.utcnow() - timedelta(days=days_back)
         
         logs = AuditLog.query.filter(
             AuditLog.created_at >= start_date
         ).order_by(AuditLog.created_at.desc()).all()
         
-        # Gerar CSV
-        import io
-        import csv
-        
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        # Cabeçalho
-        writer.writerow([
-            'ID', 'Data/Hora', 'Usuário', 'Ação', 'Tipo Entidade', 
-            'ID Entidade', 'Valores Antigos', 'Valores Novos', 'IP', 'User Agent'
-        ])
-        
-        # Dados
-        for log in logs:
+        if format_type == 'pdf':
+            # ✅ GERAR PDF (mesma qualidade dos outros relatórios)
+            from src.utils.report_generator import get_report_generator
+            
+            # Preparar dados para o PDF
+            audit_data = {
+                'period': {
+                    'days_back': days_back,
+                    'start_date': start_date.strftime('%d/%m/%Y'),
+                    'end_date': datetime.utcnow().strftime('%d/%m/%Y'),
+                    'generated_at': datetime.utcnow().isoformat()
+                },
+                'logs': [
+                    {
+                        'id': log.id,
+                        'created_at': log.created_at.strftime('%d/%m/%Y %H:%M:%S'),
+                        'user_name': log.user.full_name if log.user else 'Sistema',
+                        'action_name': log.action,
+                        'entity_type': log.entity_type or 'N/A',
+                        'ip_address': log.ip_address or 'N/A',
+                        'old_values': log.old_values or 'N/A',
+                        'new_values': log.new_values or 'N/A',
+                        'notes': log.notes if hasattr(log, 'notes') else 'N/A'
+                    }
+                    for log in logs
+                ],
+                'stats': {
+                    'total_logs': len(logs),
+                    'period_days': days_back
+                }
+            }
+            
+            report_generator = get_report_generator()
+            pdf_content = report_generator.generate_audit_logs_pdf(audit_data)
+            
+            response = make_response(pdf_content)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename="audit_logs_{datetime.now().strftime("%Y%m%d")}.pdf"'
+            
+            return response
+        else:
+            # Gerar CSV (original)
+            import io
+            import csv
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            
+            # Cabeçalho
             writer.writerow([
-                log.id,
-                log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-                log.user.full_name if log.user else 'Sistema',
-                log.action,
-                log.entity_type,
-                log.entity_id,
-                log.old_values or '',
-                log.new_values or '',
-                log.ip_address or '',
-                log.user_agent or ''
+                'ID', 'Data/Hora', 'Usuário', 'Ação', 'Tipo Entidade', 
+                'ID Entidade', 'Valores Antigos', 'Valores Novos', 'IP', 'User Agent'
             ])
-        
-        output.seek(0)
-        
-        from flask import make_response
-        
-        response = make_response(output.getvalue())
-        response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename=audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        
-        return response
+            
+            # Dados
+            for log in logs:
+                writer.writerow([
+                    log.id,
+                    log.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    log.user.full_name if log.user else 'Sistema',
+                    log.action,
+                    log.entity_type,
+                    log.entity_id,
+                    log.old_values or '',
+                    log.new_values or '',
+                    log.ip_address or '',
+                    log.user_agent or ''
+                ])
+            
+            output.seek(0)
+            
+            response = make_response(output.getvalue())
+            response.headers['Content-Type'] = 'text/csv'
+            response.headers['Content-Disposition'] = f'attachment; filename=audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            
+            return response
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

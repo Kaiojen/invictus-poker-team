@@ -1,0 +1,123 @@
+{
+  "backups": [
+    {
+      "filename": "invictus_backup_20250820_162735.db",
+      "path": "backups\\invictus_backup_20250820_162735.db",
+      "timestamp": "20250820_162735",
+      "datetime": "2025-08-20T16:27:35.346841",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250820_162735.db",
+      "path": "backups\\invictus_backup_20250820_162735.db",
+      "timestamp": "20250820_162735",
+      "datetime": "2025-08-20T16:27:35.637415",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250820_181439.db",
+      "path": "backups\\invictus_backup_20250820_181439.db",
+      "timestamp": "20250820_181439",
+      "datetime": "2025-08-20T18:14:39.268238",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250820_181439.db",
+      "path": "backups\\invictus_backup_20250820_181439.db",
+      "timestamp": "20250820_181439",
+      "datetime": "2025-08-20T18:14:39.288353",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250820_185053.db",
+      "path": "backups\\invictus_backup_20250820_185053.db",
+      "timestamp": "20250820_185053",
+      "datetime": "2025-08-20T18:50:53.824704",
+      "description": "Backup automático - 2025-08-20 18:50",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250821_225058.db",
+      "path": "backups\\invictus_backup_20250821_225058.db",
+      "timestamp": "20250821_225058",
+      "datetime": "2025-08-21T22:50:58.999298",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250821_225102.db",
+      "path": "backups\\invictus_backup_20250821_225102.db",
+      "timestamp": "20250821_225102",
+      "datetime": "2025-08-21T22:51:02.311876",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250821_235234.db",
+      "path": "backups\\invictus_backup_20250821_235234.db",
+      "timestamp": "20250821_235234",
+      "datetime": "2025-08-21T23:52:34.248765",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250821_235800.db",
+      "path": "backups\\invictus_backup_20250821_235800.db",
+      "timestamp": "20250821_235800",
+      "datetime": "2025-08-21T23:58:00.465211",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250821_235825.db",
+      "path": "backups\\invictus_backup_20250821_235825.db",
+      "timestamp": "20250821_235825",
+      "datetime": "2025-08-21T23:58:25.933806",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250821_235928.db",
+      "path": "backups\\invictus_backup_20250821_235928.db",
+      "timestamp": "20250821_235928",
+      "datetime": "2025-08-21T23:59:28.827811",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250822_000055.db",
+      "path": "backups\\invictus_backup_20250822_000055.db",
+      "timestamp": "20250822_000055",
+      "datetime": "2025-08-22T00:00:55.201745",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    },
+    {
+      "filename": "invictus_backup_20250822_000244.db",
+      "path": "backups\\invictus_backup_20250822_000244.db",
+      "timestamp": "20250822_000244",
+      "datetime": "2025-08-22T00:02:44.186888",
+      "description": "Backup inicial - Sistema iniciado",
+      "size": 4096,
+      "verified": true
+    }
+  ],
+  "created": "2025-08-20T16:24:11.202427",
+  "last_backup": "2025-08-22T00:02:44.186888"
+}

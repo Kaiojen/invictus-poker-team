@@ -1,7 +1,14 @@
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime, timedelta
 from src.models.models import db, Transaction, User, Platform, Account, UserRole, TransactionType
+from src.schemas.transactions import CreateTransactionSchema
+from src.services.transactions import TransactionService, CreateTransactionDTO
+from src.utils.pagination import paginate_query
+from src.middleware.rate_limiter import sensitive_rate_limit
+import bleach
 from src.routes.auth import login_required, admin_required
+from src.middleware.audit_middleware import audit_transaction_creation
+from src.middleware.csrf_protection import csrf_protect
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -17,8 +24,6 @@ def get_transactions():
         transaction_type = request.args.get('transaction_type')
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
-        limit = request.args.get('limit', 100, type=int)
-        offset = request.args.get('offset', 0, type=int)
         
         query = Transaction.query
         
@@ -59,90 +64,61 @@ def get_transactions():
             except ValueError:
                 return jsonify({'error': 'Invalid end_date format'}), 400
         
-        # Aplicar paginação e ordenação
-        transactions = query.order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
-        total_count = query.count()
+        # Aplicar paginação
+        query = query.order_by(Transaction.created_at.desc())
+        result = paginate_query(query, max_per_page=500)
         
         return jsonify({
-            'transactions': [transaction.to_dict() for transaction in transactions],
-            'total_count': total_count,
-            'limit': limit,
-            'offset': offset
+            'transactions': [transaction.to_dict() for transaction in result['items']],
+            'pagination': result['pagination']
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @transactions_bp.route('/', methods=['POST'])
 @admin_required
+@sensitive_rate_limit
+@csrf_protect
+@audit_transaction_creation
 def create_transaction():
     try:
         current_user = User.query.get(session['user_id'])
-        data = request.get_json()
-        
-        required_fields = ['user_id', 'platform_id', 'transaction_type', 'amount']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} is required'}), 400
-        
-        # Verificar se o usuário existe
-        user = User.query.get(data['user_id'])
+        raw = request.get_json() or {}
+
+        # Validar payload com Marshmallow
+        schema = CreateTransactionSchema()
+        payload = schema.load(raw)
+
+        # Sanitização de descrição
+        if 'description' in payload and payload['description']:
+            payload['description'] = bleach.clean(payload['description'], tags=[], strip=True)
+
+        # Verificações de existência
+        user = User.query.get(payload['user_id'])
         if not user or not user.is_active:
             return jsonify({'error': 'User not found or inactive'}), 404
-        
-        # Verificar se a plataforma existe
-        platform = Platform.query.get(data['platform_id'])
+
+        platform = Platform.query.get(payload['platform_id'])
         if not platform or not platform.is_active:
             return jsonify({'error': 'Platform not found or inactive'}), 404
-        
-        # Verificar se o usuário tem conta nesta plataforma
+
         account = Account.query.filter_by(
-            user_id=data['user_id'],
-            platform_id=data['platform_id'],
-            is_active=True
+            user_id=payload['user_id'], platform_id=payload['platform_id'], is_active=True
         ).first()
         if not account:
             return jsonify({'error': 'User does not have an active account on this platform'}), 400
-        
-        # Validar tipo de transação
-        try:
-            transaction_type = TransactionType(data['transaction_type'])
-        except ValueError:
-            return jsonify({'error': 'Invalid transaction type'}), 400
-        
-        # Validar valor
-        amount = float(data['amount'])
-        if amount <= 0:
-            return jsonify({'error': 'Amount must be greater than zero'}), 400
-        
-        # Criar transação
-        transaction = Transaction(
-            user_id=data['user_id'],
-            platform_id=data['platform_id'],
-            transaction_type=transaction_type,
-            amount=amount,
-            description=data.get('description', ''),
-            created_by=current_user.id
+
+        # Criar via serviço (regras de negócio centralizadas)
+        dto = CreateTransactionDTO(
+            user_id=payload['user_id'],
+            platform_id=payload['platform_id'],
+            transaction_type=payload['transaction_type'],
+            amount=payload['amount'],
+            description=payload.get('description', ''),
+            created_by=current_user.id,
         )
-        
-        # Atualizar saldo da conta baseado no tipo de transação
-        if transaction_type == TransactionType.RELOAD:
-            account.current_balance += amount
-            account.total_reloads += amount
-        elif transaction_type == TransactionType.WITHDRAWAL:
-            if account.current_balance < amount:
-                return jsonify({'error': 'Insufficient balance for withdrawal'}), 400
-            account.current_balance -= amount
-            account.total_withdrawals += amount
-        elif transaction_type == TransactionType.PROFIT:
-            account.current_balance += amount
-        elif transaction_type == TransactionType.LOSS:
-            account.current_balance -= amount
-            if account.current_balance < 0:
-                account.current_balance = 0  # Não permitir saldo negativo
-        
-        db.session.add(transaction)
-        db.session.commit()
-        
+        transaction = TransactionService.create(dto)
+
         return jsonify({
             'message': 'Transaction created successfully',
             'transaction': transaction.to_dict()
@@ -171,6 +147,7 @@ def get_transaction(transaction_id):
 
 @transactions_bp.route('/<int:transaction_id>', methods=['PUT'])
 @admin_required
+@csrf_protect
 def update_transaction(transaction_id):
     try:
         transaction = Transaction.query.get(transaction_id)

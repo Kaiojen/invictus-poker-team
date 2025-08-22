@@ -19,4 +19,24 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+        },
+      },
+    },
+  },
+  define: {
+    // Configurar URL da API para produção
+    'import.meta.env.VITE_API_URL': JSON.stringify(
+      process.env.NODE_ENV === 'production' 
+        ? process.env.VITE_API_URL || ''
+        : 'http://localhost:5000'
+    )
+  }
 });

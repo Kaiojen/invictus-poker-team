@@ -1,0 +1,31 @@
+{
+  "monthly_data": [
+    {
+      "month": "2024-10",
+      "pnl": 1850.75,
+      "gross_revenue": 2100.0,
+      "expenses": 249.25
+    },
+    {
+      "month": "2024-11",
+      "pnl": 2234.5,
+      "gross_revenue": 2500.0,
+      "expenses": 265.5
+    },
+    {
+      "month": "2024-12",
+      "pnl": 3120.25,
+      "gross_revenue": 3450.0,
+      "expenses": 329.75
+    },
+    {
+      "month": "2025-01",
+      "pnl": 2890.0,
+      "gross_revenue": 3200.0,
+      "expenses": 310.0
+    }
+  ],
+  "total_period_pnl": 10095.5,
+  "average_monthly_pnl": 2523.88,
+  "trend": "positive"
+}

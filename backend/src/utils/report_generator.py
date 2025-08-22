@@ -7,6 +7,7 @@ Gera relatórios em PDF e CSV com dados de jogadores, time e performance.
 import os
 import io
 import csv
+from io import BytesIO
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 from reportlab.lib import colors
@@ -21,6 +22,9 @@ from src.models.models import (
     db, User, Account, Platform, Transaction, ReloadRequest, 
     WithdrawalRequest, BalanceHistory, UserRole, Reta
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ReportGenerator:
     """Gerador de relatórios para o sistema Invictus Poker Team"""
@@ -612,6 +616,263 @@ class ReportGenerator:
     def _generate_reta_csv(self, data: Dict, start_date: datetime, end_date: datetime) -> Tuple[bytes, str]:
         """Gera CSV do relatório da reta"""
         return self._generate_team_csv(data, start_date, end_date, data['reta'].id)
+    
+    def generate_monthly_detailed_pdf(self, report_data: Dict[str, any]) -> bytes:
+        """
+        Gera PDF detalhado do relatório mensal
+        
+        Args:
+            report_data: Dados do relatório mensal
+            
+        Returns:
+            bytes: Conteúdo do PDF
+        """
+        try:
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+            
+            # Container de elementos
+            elements = []
+            
+            # Título
+            period = report_data['period']
+            title = f"RELATÓRIO MENSAL DETALHADO - {period['month_name'].upper()}"
+            elements.append(Paragraph(title, self.styles['InvictusTitle']))
+            elements.append(Spacer(1, 20))
+            
+            # Resumo Financeiro
+            financial = report_data['financial_summary']
+            elements.append(Paragraph("📊 RESUMO FINANCEIRO", self.styles['InvictusSubtitle']))
+            
+            financial_data = [
+                ['Métrica', 'Valor'],
+                ['💰 Total Reloads', self._format_currency(financial['total_reloads'])],
+                ['💸 Total Saques', self._format_currency(financial['total_withdrawals'])],
+                ['🏦 Total Investimento', self._format_currency(financial['total_team_investment'])],
+                ['📈 Total Retirado pelo Time', self._format_currency(financial['total_team_withdrawals'])],
+                ['📉 Total Retirado pelos Jogadores', self._format_currency(financial['total_player_withdrawals'])],
+                ['🎯 Lucro Líquido do Time', self._format_currency(financial['team_net_result'])],
+            ]
+            
+            financial_table = Table(financial_data, colWidths=[3*inch, 2*inch])
+            financial_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#B8860B')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(financial_table)
+            elements.append(Spacer(1, 20))
+            
+            # Jogadores Lucrativos
+            if report_data.get('profitable_players'):
+                elements.append(Paragraph("🏆 JOGADORES LUCRATIVOS", self.styles['InvictusSubtitle']))
+                
+                profitable_data = [['Jogador', 'P&L']]
+                for player in report_data['profitable_players'][:10]:  # Top 10
+                    profitable_data.append([
+                        player['name'],
+                        self._format_currency(player['pnl'])
+                    ])
+                
+                profitable_table = Table(profitable_data, colWidths=[3*inch, 2*inch])
+                profitable_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#228B22')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                
+                elements.append(profitable_table)
+                elements.append(Spacer(1, 20))
+            
+            # Saldos por Plataforma
+            if report_data.get('platform_balances'):
+                elements.append(Paragraph("🏦 SALDOS POR PLATAFORMA", self.styles['InvictusSubtitle']))
+                
+                platform_data = [['Plataforma', 'Saldo Atual', 'Investido', 'P&L']]
+                for platform, data in report_data['platform_balances'].items():
+                    platform_data.append([
+                        platform,
+                        self._format_currency(data['balance']),
+                        self._format_currency(data['investment']),
+                        self._format_currency(data['pnl'])
+                    ])
+                
+                platform_table = Table(platform_data, colWidths=[2*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                platform_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4169E1')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                
+                elements.append(platform_table)
+                elements.append(Spacer(1, 20))
+            
+            # Estatísticas
+            if report_data.get('statistics'):
+                stats = report_data['statistics']
+                elements.append(Paragraph("📊 ESTATÍSTICAS", self.styles['InvictusSubtitle']))
+                
+                stats_data = [
+                    ['Estatística', 'Valor'],
+                    ['👥 Total de Jogadores', str(stats['total_players'])],
+                    ['🏆 Jogadores Lucrativos', f"{stats['profitable_players_count']} ({stats['profitable_players_percentage']:.1f}%)"],
+                    ['🏦 Plataformas Ativas', str(stats['active_platforms'])],
+                    ['📈 P&L Médio por Jogador', self._format_currency(stats['avg_player_pnl'])],
+                ]
+                
+                stats_table = Table(stats_data, colWidths=[3*inch, 2*inch])
+                stats_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#666666')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                
+                elements.append(stats_table)
+            
+            # Rodapé
+            elements.append(Spacer(1, 30))
+            footer_text = f"Relatório gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')} | Invictus Poker Team"
+            footer_style = ParagraphStyle('FooterStyle', fontSize=8, textColor=colors.grey, alignment=1)
+            elements.append(Paragraph(footer_text, footer_style))
+            
+            # Construir PDF
+            doc.build(elements)
+            
+            # Retornar bytes
+            buffer.seek(0)
+            return buffer.getvalue()
+            
+        except Exception as e:
+            logger.error(f"Erro ao gerar PDF mensal detalhado: {str(e)}")
+            raise
+
+    def _format_currency(self, value):
+        """Formata valor como moeda USD"""
+        try:
+            return f"${float(value):,.2f}"
+        except (ValueError, TypeError):
+            return "$0.00"
+
+    def generate_audit_logs_pdf(self, audit_data: Dict[str, any]) -> bytes:
+        """
+        Gera PDF dos logs de auditoria
+        
+        Args:
+            audit_data: Dados dos logs de auditoria
+            
+        Returns:
+            bytes: Conteúdo do PDF
+        """
+        try:
+            buffer = BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+            
+            # Container de elementos
+            elements = []
+            
+            # Título
+            period = audit_data['period']
+            title = f"LOGS DE AUDITORIA - {period['start_date']} a {period['end_date']}"
+            elements.append(Paragraph(title, self.styles['InvictusTitle']))
+            elements.append(Spacer(1, 20))
+            
+            # Resumo
+            stats = audit_data['stats']
+            elements.append(Paragraph("📊 RESUMO", self.styles['InvictusSubtitle']))
+            
+            stats_data = [
+                ['Período', f"{period['days_back']} dias"],
+                ['Total de Logs', str(stats['total_logs'])],
+                ['Data de Geração', period['end_date']],
+            ]
+            
+            stats_table = Table(stats_data, colWidths=[2*inch, 3*inch])
+            stats_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#B8860B')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            
+            elements.append(stats_table)
+            elements.append(Spacer(1, 20))
+            
+            # Logs de Auditoria (máximo 50 para não sobrecarregar)
+            if audit_data.get('logs'):
+                elements.append(Paragraph("📋 LOGS DE AUDITORIA", self.styles['InvictusSubtitle']))
+                
+                logs_data = [['Data/Hora', 'Usuário', 'Ação', 'Entidade', 'IP']]
+                for log in audit_data['logs'][:50]:  # Máximo 50 logs
+                    logs_data.append([
+                        log['created_at'],
+                        log['user_name'][:20] + '...' if len(log['user_name']) > 20 else log['user_name'],
+                        log['action_name'][:15] + '...' if len(log['action_name']) > 15 else log['action_name'],
+                        log['entity_type'],
+                        log['ip_address'][:12] + '...' if len(log['ip_address']) > 12 else log['ip_address']
+                    ])
+                
+                logs_table = Table(logs_data, colWidths=[1.2*inch, 1.5*inch, 1.2*inch, 1*inch, 1.1*inch])
+                logs_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4169E1')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('FONTSIZE', (0, 1), (-1, -1), 7),  # Fonte menor para dados
+                ]))
+                
+                elements.append(logs_table)
+                
+                if len(audit_data['logs']) > 50:
+                    elements.append(Spacer(1, 10))
+                    note = f"Nota: Mostrando os primeiros 50 logs de {len(audit_data['logs'])} total. Para ver todos, use o filtro na interface."
+                    note_style = ParagraphStyle('NoteStyle', fontSize=8, textColor=colors.grey, alignment=1)
+                    elements.append(Paragraph(note, note_style))
+            
+            # Rodapé
+            elements.append(Spacer(1, 30))
+            footer_text = f"Relatório de auditoria gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')} | Invictus Poker Team"
+            footer_style = ParagraphStyle('FooterStyle', fontSize=8, textColor=colors.grey, alignment=1)
+            elements.append(Paragraph(footer_text, footer_style))
+            
+            # Construir PDF
+            doc.build(elements)
+            
+            # Retornar bytes
+            buffer.seek(0)
+            return buffer.getvalue()
+            
+        except Exception as e:
+            logger.error(f"Erro ao gerar PDF de auditoria: {str(e)}")
+            raise
 
 
 # Instância global do gerador

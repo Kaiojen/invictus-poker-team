@@ -10,6 +10,7 @@ import json
 import time
 import threading
 from typing import Dict, Set
+from queue import Queue, Empty
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,15 +25,48 @@ class SSEConnection:
     def __init__(self, user_id: int):
         self.user_id = user_id
         self.last_ping = time.time()
-        
-    def send_event(self, event_type: str, data: dict):
-        """Envia um evento SSE"""
+        # Fila de eventos por conexão (thread-safe)
+        self._queue: Queue[str] = Queue(maxsize=1000)
+        self._closed = False
+
+    def send_event(self, event_type: str, data: dict) -> str | None:
+        """Formata um evento SSE para envio"""
         try:
             event_data = json.dumps(data)
             return f"event: {event_type}\ndata: {event_data}\n\n"
         except Exception as e:
             logger.error(f"Erro ao formatar evento SSE: {e}")
             return None
+
+    def enqueue(self, event_type: str, data: dict) -> None:
+        """Coloca um evento na fila para esta conexão"""
+        if self._closed:
+            return
+        payload = self.send_event(event_type, data)
+        if payload is None:
+            return
+        try:
+            # Evitar bloqueio infinito se fila cheia: descartar o mais antigo
+            if self._queue.full():
+                try:
+                    self._queue.get_nowait()
+                except Empty:
+                    pass
+            self._queue.put_nowait(payload)
+        except Exception as e:
+            logger.error(f"Erro ao enfileirar evento SSE: {e}")
+
+    def get_next(self, timeout: float = 30.0) -> str | None:
+        """Obtém próximo evento ou None em timeout"""
+        if self._closed:
+            return None
+        try:
+            return self._queue.get(timeout=timeout)
+        except Empty:
+            return None
+
+    def close(self) -> None:
+        self._closed = True
 
 def add_connection(user_id: int, connection):
     """Adiciona uma conexão ativa"""
@@ -58,10 +92,9 @@ def broadcast_to_user(user_id: int, event_type: str, data: dict):
             connections_to_remove = set()
             for connection in active_connections[user_id]:
                 try:
-                    event_data = connection.send_event(event_type, data)
-                    if event_data:
-                        # Adicionar à queue da conexão (simulado)
-                        logger.debug(f"Evento {event_type} enviado para usuário {user_id}")
+                    # Enfileirar para consumo pelo generator
+                    connection.enqueue(event_type, data)
+                    logger.debug(f"Evento {event_type} enfileirado para usuário {user_id}")
                 except Exception as e:
                     logger.error(f"Erro ao enviar evento SSE: {e}")
                     connections_to_remove.add(connection)
@@ -90,27 +123,36 @@ def stream_events():
     def event_generator():
         connection = SSEConnection(user_id)
         add_connection(user_id, connection)
-        
+
         try:
-            # Enviar evento inicial de conexão
-            yield connection.send_event('connected', {
+            # Evento inicial
+            initial = connection.send_event('connected', {
                 'message': 'Conectado ao stream de eventos',
                 'timestamp': time.time()
             })
-            
-            # Manter conexão viva com pings
+            if initial:
+                yield initial
+
+            # Loop principal: drenar fila e enviar ping se ocioso
             while True:
-                yield connection.send_event('ping', {
-                    'timestamp': time.time()
-                })
-                time.sleep(30)  # Ping a cada 30 segundos
-                
+                payload = connection.get_next(timeout=25.0)
+                if payload:
+                    yield payload
+                else:
+                    # Sem eventos recentes, enviar ping para manter conexão
+                    ping = connection.send_event('ping', {'timestamp': time.time()})
+                    if ping:
+                        yield ping
+
         except GeneratorExit:
             logger.info(f"Conexão SSE encerrada para usuário {user_id}")
         except Exception as e:
             logger.error(f"Erro na conexão SSE: {e}")
         finally:
-            remove_connection(user_id, connection)
+            try:
+                connection.close()
+            finally:
+                remove_connection(user_id, connection)
     
     response = Response(
         event_generator(),
@@ -248,12 +290,23 @@ def notify_reload_approved(reload_request):
 def notify_balance_updated(user_id, account_id, old_balance, new_balance):
     """Notifica sobre atualização de saldo"""
     try:
-        broadcast_to_user(user_id, 'balance_updated', {
+        # ✅ MELHORADO: Incluir user_id para filtrar gráficos
+        event_data = {
             'account_id': account_id,
+            'user_id': user_id,  # ✅ CRÍTICO: Para filtrar no BankrollChart
             'old_balance': float(old_balance),
             'new_balance': float(new_balance),
+            'change_amount': float(new_balance) - float(old_balance),
             'timestamp': time.time()
-        })
+        }
+        
+        # Notificar o próprio usuário
+        broadcast_to_user(user_id, 'balance_updated', event_data)
+        
+        # ✅ CRÍTICO: Notificar admins/managers para atualizar TeamProfitChart
+        broadcast_to_role(UserRole.ADMIN, 'balance_updated', event_data)
+        broadcast_to_role(UserRole.MANAGER, 'balance_updated', event_data)
+        
     except Exception as e:
         logger.error(f"Erro ao notificar saldo atualizado: {e}")
 

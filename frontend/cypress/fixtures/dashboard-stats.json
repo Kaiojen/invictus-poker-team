@@ -1,0 +1,42 @@
+{
+  "totalBalance": 2850.5,
+  "pnl": 425.75,
+  "monthlyPnl": 1250.0,
+  "pendingReloads": 3,
+  "pendingWithdrawals": 1,
+  "platforms": [
+    {
+      "name": "pokerstars",
+      "balance": 1200.0,
+      "pnl": 200.5
+    },
+    {
+      "name": "gg",
+      "balance": 1450.5,
+      "pnl": 325.25
+    },
+    {
+      "name": "luxon",
+      "balance": 200.0,
+      "pnl": 0.0
+    }
+  ],
+  "recentTransactions": [
+    {
+      "id": 1,
+      "type": "reload",
+      "amount": 500.0,
+      "platform": "pokerstars",
+      "date": "2025-01-15T10:30:00Z",
+      "status": "approved"
+    },
+    {
+      "id": 2,
+      "type": "withdrawal",
+      "amount": 200.0,
+      "platform": "gg",
+      "date": "2025-01-14T15:20:00Z",
+      "status": "pending"
+    }
+  ]
+}

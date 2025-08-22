@@ -1,4 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap");
+@import "./styles/modal-fixes.css";
+@import "./styles/ux-refinements.css";
 
 @tailwind base;
 @tailwind components;
@@ -91,6 +93,14 @@
 }
 
 @layer components {
+  /* Oculta scrollbars para containers horizontais (usado em TabsList) */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
   /* Enhanced Invictus Gold Components */
   .invictus-gold {
     color: hsl(var(--invictus-gold));
@@ -571,11 +581,15 @@
 
 /* Tabelas responsivas */
 .responsive-table {
-  @apply min-w-full divide-y divide-gray-200;
+  @apply min-w-full;
+}
+
+.responsive-table tr {
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .responsive-table-wrapper {
-  @apply overflow-x-auto shadow ring-1 ring-black ring-opacity-5 md:rounded-lg;
+  @apply overflow-x-auto rounded-lg border;
 }
 
 /* Headers sticky em mobile */
@@ -810,3 +824,5 @@
     @apply flex-col space-y-2 space-x-0;
   }
 }
+
+/* Import modal fixes for better readability - moved to top */

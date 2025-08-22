@@ -4,9 +4,14 @@ from sqlalchemy import func
 from src.models.models import (
     db, User, Account, Platform, BalanceHistory, UserRole, 
     AccountStatus, ReloadRequest, WithdrawalRequest, PlayerData,
-    RequiredField, PlayerFieldValue
+    RequiredField, PlayerFieldValue, ReloadStatus, WithdrawalStatus
 )
 from src.routes.auth import login_required, admin_required
+from src.middleware.audit_middleware import audit_balance_update
+from src.middleware.csrf_protection import csrf_protect
+from src.services.accounts import AccountService, UpdateBalanceDTO
+from src.schemas.accounts import UpdateBalanceSchema
+import bleach
 import json
 
 planilhas_bp = Blueprint('planilhas', __name__)
@@ -29,12 +34,30 @@ def get_user_spreadsheet(user_id):
         # Buscar todas as contas do usuário
         accounts = Account.query.filter_by(user_id=user_id, is_active=True).all()
         
-        # Buscar todas as plataformas disponíveis
+        # Buscar todas as plataformas disponíveis (apenas ativas)
+        # e remover duplicidades de Luxon, garantindo apenas 'LuxonPay'
         all_platforms = Platform.query.filter_by(is_active=True).all()
+        # Normalizar Luxon: se houver alguma plataforma cujo nome contenha 'luxon'
+        # manter somente aquela cujo name == 'luxonpay'
+        luxon_main = None
+        normalized_platforms = []
+        for plat in all_platforms:
+            name_lower = (plat.name or '').lower()
+            if 'luxon' in name_lower:
+                if name_lower == 'luxonpay' and not luxon_main:
+                    luxon_main = plat
+                # Demais variantes de luxon são ignoradas
+                continue
+            normalized_platforms.append(plat)
+        if luxon_main:
+            normalized_platforms.append(luxon_main)
+        else:
+            # Se por algum motivo não houver 'luxonpay', usa lista original
+            normalized_platforms = normalized_platforms or all_platforms
         
         # Criar lista de todas as plataformas com contas (existentes ou não)
         all_platform_accounts = []
-        for platform in all_platforms:
+        for platform in normalized_platforms:
             # Verificar se o usuário tem conta nesta plataforma
             existing_account = next((acc for acc in accounts if acc.platform_id == platform.id), None)
             
@@ -59,28 +82,94 @@ def get_user_spreadsheet(user_id):
             
             all_platform_accounts.append(platform_account)
         
-        # Calcular totais seguindo a regra do time:
-        # - Banca inicial do time vinculada somente à Luxon
-        # - Sites não usam banca inicial (apenas banca atual)
-        total_initial = 0.0
-        total_current = 0.0
+        # Calcular totais seguindo a regra CORRETA do time conforme ABA Administrador_.md:
+        # - INVESTIMENTO TOTAL = Luxon initial_balance + TODOS os reloads aprovados
+        # - P&L TOTAL = Saldo total atual - Investimento total
+        # - Saldo total = soma de TODAS as contas (incluindo Luxon)
+        
+        # 🚨 NOVA LÓGICA: Investimento pode ser manual ou automático
+        total_investment = 0.0  # Investimento TOTAL do time
+        total_current = 0.0     # Saldo atual total (todas as contas)
+        is_manual_investment = False
+        
+        # 1. ✅ VERIFICAR SE HÁ INVESTIMENTO MANUAL DEFINIDO
+        manual_investment_account = None
+        manual_investment_notes = None
+        
         for acc in accounts:
-            if acc.platform and acc.platform.name.lower() == 'luxon':
-                total_initial += float(acc.initial_balance)
-                total_current += float(acc.current_balance)
-            else:
-                total_current += float(acc.current_balance)
-        total_pnl = total_current - total_initial
+            # ✅ Verificação mais robusta para investimento manual
+            manual_value = acc.manual_team_investment
+            if manual_value is not None and float(manual_value) > 0:
+                manual_investment_account = acc
+                manual_investment_notes = acc.investment_notes
+                is_manual_investment = True
+                total_investment = float(manual_value)
+                break
+        
+        # 2. CÁLCULO AUTOMÁTICO: valor depositado pelo time (normalmente Luxon initial_balance)
+        if not is_manual_investment:
+            luxon_initial = 0.0
+            for acc in accounts:
+                if acc.has_account and acc.platform and 'luxon' in acc.platform.name.lower():
+                    luxon_initial += float(acc.initial_balance or 0)
+                    break  # Luxon é única, parar aqui
+            
+            # Se não há Luxon, usar soma de todos os initial_balance (fallback)
+            if luxon_initial == 0:
+                for acc in accounts:
+                    if acc.has_account:
+                        luxon_initial += float(acc.initial_balance or 0)
+            
+            total_investment = luxon_initial
+        
+        # 3. SOMAR RELOADS APROVADOS
+        all_approved_reloads = db.session.query(func.sum(ReloadRequest.amount)).filter_by(
+            user_id=user_id,
+            status=ReloadStatus.APPROVED
+        ).scalar() or 0
+        
+        # ✅ SOMAR RELOADS (AUTOMÁTICOS OU MANUAIS)
+        # 1. Se há reload manual definido, usar esse valor
+        manual_reload_total = 0.0
+        has_manual_reload = False
+        manual_reload_notes = None
+        
+        for acc in accounts:
+            if acc.manual_reload_amount is not None:
+                manual_reload_total += float(acc.manual_reload_amount)
+                has_manual_reload = True
+                if acc.reload_notes:
+                    manual_reload_notes = acc.reload_notes
+        
+        # 2. Se não há reload manual, usar reloads aprovados automáticos
+        if has_manual_reload:
+            total_investment += manual_reload_total
+        else:
+            # Somar reloads automáticos apenas se não há investimento manual
+            if not is_manual_investment:
+                total_investment += float(all_approved_reloads)
+        
+        # 4. CRÉDITOS DE SAQUE (temporariamente desabilitado)
+        team_withdrawal_credits = 0.0  # Será implementado após migrations
+        
+        # 5. SALDO ATUAL: soma de todas as contas
+        for acc in accounts:
+            if acc.has_account:
+                current = float(acc.current_balance or 0)
+                total_current += current
+        
+        # 6. P&L TOTAL = Saldo total atual - Investimento total (manual ou automático)
+        total_pnl = total_current - total_investment
         
         # Buscar solicitações pendentes
         pending_reloads = ReloadRequest.query.filter_by(
             user_id=user_id, 
-            status='pending'
+            status=ReloadStatus.PENDING
         ).all()
         
         pending_withdrawals = WithdrawalRequest.query.filter_by(
             user_id=user_id, 
-            status='pending'
+            status=WithdrawalStatus.PENDING
         ).all()
         
         # Verificar dados incompletos
@@ -111,15 +200,33 @@ def get_user_spreadsheet(user_id):
         if incomplete_data:
             deep_links['first_pending_field'] = f"/dashboard?tab=planilha#field-{incomplete_data[0].field_name}"
 
-        # Banca anterior (dia anterior) por plataforma
-        start_today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        # ✅ CORREÇÃO ROBUSTA: Buscar saldo anterior com múltiplas estratégias
         previous_balances = {}
         for acc in accounts:
-            hist = BalanceHistory.query \
+            start_today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            
+            # 1. Buscar último registro ANTES de hoje (dia anterior ou mais antigo)
+            hist_yesterday = BalanceHistory.query \
                 .filter(BalanceHistory.account_id == acc.id, BalanceHistory.created_at < start_today) \
                 .order_by(BalanceHistory.created_at.desc()) \
                 .first()
-            previous_balances[acc.id] = float(hist.new_balance) if hist else None
+            
+            if hist_yesterday:
+                # Encontrou histórico de dia anterior
+                previous_balances[acc.id] = float(hist_yesterday.new_balance)
+            else:
+                # 2. Se não há histórico anterior, verificar se há registro de hoje
+                hist_today = BalanceHistory.query \
+                    .filter(BalanceHistory.account_id == acc.id, BalanceHistory.created_at >= start_today) \
+                    .order_by(BalanceHistory.created_at.asc()) \
+                    .first()
+                
+                if hist_today:
+                    # Há registro hoje - usar o old_balance do primeiro registro de hoje
+                    previous_balances[acc.id] = float(hist_today.old_balance)
+                else:
+                    # 3. Fallback final: usar initial_balance
+                    previous_balances[acc.id] = float(acc.initial_balance) if acc.initial_balance else 0.0
 
         return jsonify({
             'user': user.to_dict(),
@@ -130,9 +237,17 @@ def get_user_spreadsheet(user_id):
             ],
             'all_platform_accounts': all_platform_accounts,  # Todas as plataformas, com ou sem conta
             'summary': {
-                'total_initial_balance': total_initial,
+                'total_investment': total_investment,      # 💰 Investimento total (manual ou automático)
+                'is_manual_investment': is_manual_investment,  # ✅ Agora funcional
+                'manual_investment_notes': manual_investment_notes,  # ✅ Notas do investimento manual
+                'total_initial_balance': total_investment, # Compatibilidade com frontend
                 'total_current_balance': total_current,
-                'total_pnl': total_pnl,
+                'total_pnl': total_pnl,                   # P&L baseado em investimento total
+                'approved_reload_amount': manual_reload_total if has_manual_reload else float(all_approved_reloads),  # ✅ Usar reload manual se existe
+                'total_approved_reloads': manual_reload_total if has_manual_reload else float(all_approved_reloads),  # ✅ Same value para compatibilidade
+                'has_manual_reload': has_manual_reload,  # ✅ NOVO: Indicar se tem reload manual
+                'manual_reload_notes': manual_reload_notes,  # ✅ Notas do reload manual
+                'team_withdrawal_credits': team_withdrawal_credits,  # Créditos de saque (futuro)
                 'accounts_count': len(accounts),
                 'active_accounts': len([acc for acc in accounts if acc.has_account])
             },
@@ -150,6 +265,7 @@ def get_user_spreadsheet(user_id):
 
 @planilhas_bp.route('/user/<int:user_id>/platform/<int:platform_id>/upsert', methods=['PUT'])
 @login_required
+@csrf_protect
 def upsert_account_by_platform(user_id, platform_id):
     """Criar ou atualizar conta de um usuário em uma plataforma específica.
     - Admins/Managers podem alterar qualquer usuário
@@ -209,6 +325,7 @@ def upsert_account_by_platform(user_id, platform_id):
 
 @planilhas_bp.route('/user/<int:user_id>/close-day', methods=['POST'])
 @login_required
+@csrf_protect
 def close_day(user_id):
     """Fechar o dia: grava o saldo atual de todas as contas ativas no histórico,
     para uso como 'banca anterior' no dia seguinte."""
@@ -225,7 +342,7 @@ def close_day(user_id):
                 new_balance=acc.current_balance,
                 change_reason='close_day',
                 notes='Fechamento diário automático',
-                changed_by=current_user.id,
+                changed_by=current_user.id
             )
             db.session.add(history)
             # Atualiza timestamp de última atualização
@@ -248,6 +365,8 @@ def close_day(user_id):
 
 @planilhas_bp.route('/account/<int:account_id>/update-balance', methods=['PUT'])
 @login_required
+@csrf_protect
+@audit_balance_update
 def update_account_balance(account_id):
     """Atualizar saldo de uma conta"""
     try:
@@ -261,31 +380,36 @@ def update_account_balance(account_id):
         if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER] and current_user.id != account.user_id:
             return jsonify({'error': 'Access denied'}), 403
         
-        data = request.get_json()
+        # ✅ CORREÇÃO DIRETA: Processar dados robustamente SEM dependência de schema
+        raw_data = request.get_json() or {}
         
-        if 'current_balance' not in data:
-            return jsonify({'error': 'current_balance is required'}), 400
+        # Compatibilidade total - aceitar ambos formatos
+        new_balance = None
+        if 'new_balance' in raw_data:
+            new_balance = float(raw_data['new_balance'])
+        elif 'current_balance' in raw_data:
+            new_balance = float(raw_data['current_balance'])  # ✅ Aceitar formato antigo
         
-        new_balance = float(data['current_balance'])
+        if new_balance is None:
+            return jsonify({'error': 'new_balance ou current_balance é obrigatório'}), 400
+            
         if new_balance < 0:
             return jsonify({'error': 'Balance cannot be negative'}), 400
-        
+            
+        # Extrair notes de forma segura
+        notes = raw_data.get('notes', '')
+        change_reason = raw_data.get('change_reason', 'manual_update')
+
         old_balance = float(account.current_balance)
-        
-        # Criar registro no histórico
-        history = BalanceHistory(
+
+        # ✅ Atualizar via serviço (cria history e atualiza conta)
+        AccountService.update_balance(UpdateBalanceDTO(
             account_id=account_id,
-            old_balance=old_balance,
             new_balance=new_balance,
-            change_reason='manual_update',
-            notes=data.get('notes', ''),
-            changed_by=current_user.id
-        )
-        
-        # Atualizar conta
-        account.current_balance = new_balance
-        account.last_balance_update = datetime.utcnow()
-        account.balance_verified = data.get('verified', False)
+            changed_by=current_user.id,
+            change_reason=change_reason,
+            notes=bleach.clean(notes, tags=[], strip=True)
+        ))
         
         # Atualizar status baseado no saldo
         if not account.has_account:
@@ -299,7 +423,6 @@ def update_account_balance(account_id):
         else:
             account.status = AccountStatus.ACTIVE
         
-        db.session.add(history)
         db.session.commit()
         
         # Notificar via SSE sobre atualização de saldo
@@ -313,8 +436,7 @@ def update_account_balance(account_id):
         
         return jsonify({
             'message': 'Balance updated successfully',
-            'account': account.to_dict(),
-            'history': history.to_dict()
+            'account': account.to_dict()
         }), 200
     except Exception as e:
         db.session.rollback()
@@ -322,6 +444,7 @@ def update_account_balance(account_id):
 
 @planilhas_bp.route('/account/<int:account_id>/toggle-account', methods=['PUT'])
 @login_required
+@csrf_protect
 def toggle_account_status(account_id):
     """Ativar/desativar se o jogador tem conta na plataforma"""
     try:
@@ -514,6 +637,7 @@ def get_fields():
 
 @planilhas_bp.route('/fields', methods=['POST'])
 @admin_required
+@csrf_protect
 def create_field():
     """Criar novo campo na planilha (apenas admin)"""
     try:
@@ -561,6 +685,7 @@ def create_field():
 
 @planilhas_bp.route('/fields/<int:field_id>', methods=['PUT'])
 @admin_required
+@csrf_protect
 def update_field(field_id):
     """Atualizar campo existente (apenas admin)"""
     try:
@@ -639,6 +764,7 @@ def get_user_field_values(user_id):
 
 @planilhas_bp.route('/user/<int:user_id>/field', methods=['PUT'])
 @login_required
+@csrf_protect
 def update_user_field_value(user_id):
     """Atualizar valor de um campo do usuário"""
     try:
@@ -745,11 +871,11 @@ def get_user_completeness(user_id):
                 db.or_(
                     db.and_(
                         ReloadRequest.user_id == user_id,
-                        ReloadRequest.status == 'pending'
+                        ReloadRequest.status == ReloadStatus.PENDING
                     ),
                     db.and_(
                         WithdrawalRequest.user_id == user_id,
-                        WithdrawalRequest.status == 'pending'
+                        WithdrawalRequest.status == WithdrawalStatus.PENDING
                     )
                 )
             )

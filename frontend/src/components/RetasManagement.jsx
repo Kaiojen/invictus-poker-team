@@ -34,7 +34,6 @@ import {
   Users,
   DollarSign,
   Target,
-  Settings,
   CheckCircle,
   AlertTriangle,
 } from "lucide-react";
@@ -189,9 +188,8 @@ const RetasManagement = ({ userRole }) => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="gradient-gold-text flex items-center">
-                <Target className="w-6 h-6 mr-2" />
-                🎯 Gestão de Retas
+              <CardTitle className="gradient-gold-text">
+                Gestão de Retas
               </CardTitle>
               <CardDescription>
                 Configure os níveis de stakes e permissões por jogador
@@ -306,10 +304,7 @@ const RetasManagement = ({ userRole }) => {
                       className="cursor-pointer hover:bg-secondary/20"
                     >
                       <TableCell className="font-medium">
-                        <div className="flex items-center space-x-2">
-                          <Target className="w-4 h-4 text-primary" />
-                          <span>{reta.name}</span>
-                        </div>
+                        <span>{reta.name}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-1">
@@ -355,13 +350,11 @@ const RetasManagement = ({ userRole }) => {
                           <div className="flex space-x-1 justify-end">
                             <Button
                               size="sm"
-                              variant="outline"
                               onClick={() => handleEdit(reta)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-500 shadow-lg"
+                              title="Editar Reta"
                             >
                               <Edit className="w-3 h-3" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Settings className="w-3 h-3" />
                             </Button>
                           </div>
                         </TableCell>
@@ -383,12 +376,12 @@ const RetasManagement = ({ userRole }) => {
           if (!open) resetForm();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md reta-modal-fix">
           <DialogHeader>
-            <DialogTitle className="gradient-gold-text">
-              {editingReta ? "Editar Reta" : "Nova Reta"}
+            <DialogTitle className="gradient-gold-text text-xl">
+              {editingReta ? "✏️ Editar Reta" : "➕ Nova Reta"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-gray-300">
               {editingReta
                 ? "Modifique os dados da reta selecionada"
                 : "Configure uma nova reta para organizar os jogadores"}
@@ -404,21 +397,32 @@ const RetasManagement = ({ userRole }) => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Nome da Reta</Label>
+              <Label
+                htmlFor="name"
+                className="text-gray-200 font-medium flex items-center gap-2"
+              >
+                🎯 Nome da Reta
+              </Label>
               <Input
                 id="name"
                 placeholder="Ex: Reta 0, Reta 1..."
                 value={retaForm.name}
                 onChange={(e) => handleChange("name", e.target.value)}
                 required
+                className="bg-gray-700 border-2 border-yellow-500 text-white placeholder:text-gray-400 focus:border-yellow-400"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="min_stake">Stake Mínimo</Label>
+                <Label
+                  htmlFor="min_stake"
+                  className="text-gray-200 font-medium flex items-center gap-2"
+                >
+                  💰 Stake Mínimo
+                </Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-yellow-400" />
                   <Input
                     id="min_stake"
                     type="number"
@@ -427,16 +431,21 @@ const RetasManagement = ({ userRole }) => {
                     placeholder="1.00"
                     value={retaForm.min_stake}
                     onChange={(e) => handleChange("min_stake", e.target.value)}
-                    className="pl-10"
+                    className="pl-10 bg-gray-700 border-2 border-yellow-500 text-white placeholder:text-gray-400 focus:border-yellow-400"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max_stake">Stake Máximo</Label>
+                <Label
+                  htmlFor="max_stake"
+                  className="text-gray-200 font-medium flex items-center gap-2"
+                >
+                  💎 Stake Máximo
+                </Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <DollarSign className="absolute left-3 top-3 h-4 w-4 text-yellow-400" />
                   <Input
                     id="max_stake"
                     type="number"
@@ -445,7 +454,7 @@ const RetasManagement = ({ userRole }) => {
                     placeholder="2.50"
                     value={retaForm.max_stake}
                     onChange={(e) => handleChange("max_stake", e.target.value)}
-                    className="pl-10"
+                    className="pl-10 bg-gray-700 border-2 border-yellow-500 text-white placeholder:text-gray-400 focus:border-yellow-400"
                     required
                   />
                 </div>
@@ -453,13 +462,19 @@ const RetasManagement = ({ userRole }) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Descrição (opcional)</Label>
+              <Label
+                htmlFor="description"
+                className="text-gray-200 font-medium flex items-center gap-2"
+              >
+                📝 Descrição (opcional)
+              </Label>
               <Textarea
                 id="description"
                 placeholder="Descrição detalhada da reta, regras específicas..."
                 value={retaForm.description}
                 onChange={(e) => handleChange("description", e.target.value)}
                 rows={3}
+                className="bg-gray-700 border-2 border-yellow-500 text-white placeholder:text-gray-400 focus:border-yellow-400 resize-none"
               />
             </div>
 
@@ -467,12 +482,16 @@ const RetasManagement = ({ userRole }) => {
               <Button
                 type="button"
                 variant="outline"
+                className="bg-gray-600 border-gray-500 text-gray-200 hover:bg-gray-500 hover:text-white"
                 onClick={() => setShowCreateModal(false)}
               >
-                Cancelar
+                ❌ Cancelar
               </Button>
-              <Button type="submit" className="gradient-gold">
-                {editingReta ? "Atualizar" : "Criar"} Reta
+              <Button
+                type="submit"
+                className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-gray-900 font-semibold border border-yellow-400"
+              >
+                {editingReta ? "✅ Atualizar" : "➕ Criar"} Reta
               </Button>
             </div>
           </form>

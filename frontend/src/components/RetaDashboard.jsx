@@ -143,11 +143,12 @@ const RetaDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 reta-dashboard-fix">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold gradient-gold-text">
-            📊 Dashboard de Retas
+          <h2 className="text-3xl font-bold gradient-gold-text flex items-center gap-2 fade-in">
+            <BarChart3 className="w-8 h-8 text-primary" />
+            Dashboard de Retas
           </h2>
           <p className="text-muted-foreground">
             Análise de performance e gestão de retas
@@ -155,13 +156,14 @@ const RetaDashboard = () => {
         </div>
         <div className="flex items-center gap-4">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-32 period-filter-fix">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="dropdown-content-fix">
               <SelectItem value="7">7 dias</SelectItem>
               <SelectItem value="30">30 dias</SelectItem>
               <SelectItem value="90">90 dias</SelectItem>
+              <SelectItem value="365">365 dias</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -341,7 +343,7 @@ const RetaDashboard = () => {
                 <TableHead>Reta</TableHead>
                 <TableHead>Lucro</TableHead>
                 <TableHead>ROI</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Último Acesso</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -398,14 +400,12 @@ const RetaDashboard = () => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getPerformanceIcon(player.profit)}
-                      {player.makeup > 0 && (
-                        <AlertTriangle
-                          className="w-4 h-4 text-orange-400"
-                          title="Com makeup"
-                        />
-                      )}
+                    <div className="text-sm text-muted-foreground">
+                      {player.last_activity
+                        ? new Date(player.last_activity).toLocaleDateString(
+                            "pt-BR"
+                          )
+                        : "Sem atividade"}
                     </div>
                   </TableCell>
                 </TableRow>

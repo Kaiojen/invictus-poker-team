@@ -417,6 +417,41 @@ class NotificationService:
             return 0
     
     @staticmethod
+    def delete_notification(notification_id: int, user_id: int) -> bool:
+        """Exclui uma notificação específica do usuário"""
+        try:
+            notification = Notification.query.filter(
+                Notification.id == notification_id,
+                Notification.user_id == user_id
+            ).first()
+            
+            if not notification:
+                return False
+            
+            db.session.delete(notification)
+            db.session.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao excluir notificação: {str(e)}")
+            db.session.rollback()
+            return False
+    
+    @staticmethod
+    def clear_read_notifications(user_id: int) -> int:
+        """Remove todas as notificações já lidas do usuário"""
+        try:
+            count = Notification.query.filter(
+                Notification.user_id == user_id,
+                Notification.is_read == True
+            ).delete()
+            db.session.commit()
+            return count
+        except Exception as e:
+            logger.error(f"Erro ao limpar notificações lidas: {str(e)}")
+            db.session.rollback()
+            return 0
+    
+    @staticmethod
     def clean_old_notifications(days: int = 30):
         """Remove notificações antigas"""
         try:
@@ -436,25 +471,27 @@ class NotificationService:
     
     @staticmethod
     def get_notification_stats(user_id: int) -> dict:
-        """Estatísticas de notificações do usuário"""
+        """Estatísticas de notificações do usuário (apenas não expiradas)"""
         try:
-            total = Notification.query.filter(Notification.user_id == user_id).count()
-            unread = Notification.query.filter(
+            now = datetime.utcnow()
+            base = Notification.query.filter(
                 Notification.user_id == user_id,
-                Notification.is_read == False
-            ).count()
-            urgent = Notification.query.filter(
-                Notification.user_id == user_id,
+                or_(Notification.expires_at.is_(None), Notification.expires_at > now)
+            )
+
+            total = base.count()
+            unread = base.filter(Notification.is_read == False).count()
+            urgent = base.filter(
                 Notification.is_urgent == True,
                 Notification.is_read == False
             ).count()
-            
+
             return {
                 'total': total,
                 'unread': unread,
                 'urgent': urgent
             }
-            
+
         except Exception as e:
             logger.error(f"Erro ao obter estatísticas: {str(e)}")
             return {'total': 0, 'unread': 0, 'urgent': 0}

@@ -1,11 +1,42 @@
 from flask import Blueprint, request, jsonify, session
 from src.models.models import db, User, UserRole, PlayerData, Account, Transaction, TransactionType, Reta, BalanceHistory
 from src.routes.auth import login_required, admin_required
+from src.middleware.audit_middleware import audit_user_creation, audit_action
+from src.middleware.csrf_protection import csrf_protect
+from src.schemas.users import CreateUserSchema, UpdateUserSchema
+from src.utils.pagination import paginate_query
+from src.services.users import UserService, CreateUserDTO, UpdateUserDTO
+import bleach
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from sqlalchemy import and_
 
 users_bp = Blueprint('users', __name__)
+@users_bp.route('/cleanup-tests', methods=['POST'])
+@admin_required
+def cleanup_tests():
+    """Endpoint administrativo para limpar usuários/contas de teste."""
+    try:
+        from src.utils.cleanup import cleanup_test_data, cleanup_test_platforms
+        result = cleanup_test_data(commit=True)
+        result.update(cleanup_test_platforms(commit=True))
+        return jsonify({"message": "Test data removed", "result": result}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@users_bp.route('/simulate-year-data', methods=['POST'])
+@admin_required
+def simulate_year_data():
+    """Endpoint administrativo para simular 1 ano completo de dados."""
+    try:
+        from src.utils.data_simulation import simulate_full_year_operation
+        result = simulate_full_year_operation()
+        return jsonify({"message": "Year simulation completed", "result": result}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 @users_bp.route('/<int:user_id>/calendar-tracker', methods=['GET'])
 @login_required
 def get_calendar_tracker(user_id):
@@ -60,55 +91,45 @@ def get_users():
         if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
             return jsonify({'error': 'Access denied'}), 403
         
-        users = User.query.filter_by(is_active=True).all()
-        return jsonify({'users': [user.to_dict() for user in users]}), 200
+        query = User.query.filter_by(is_active=True).order_by(User.created_at.desc())
+        result = paginate_query(query, max_per_page=200)
+        return jsonify({
+            'users': [user.to_dict() for user in result['items']],
+            'pagination': result['pagination']
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/', methods=['POST'])
 @admin_required
+@csrf_protect
+@audit_user_creation
 def create_user():
     try:
-        data = request.get_json()
-        
-        required_fields = ['username', 'email', 'password', 'full_name', 'role']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({'error': f'{field} is required'}), 400
-        
-        # Verificar se username ou email já existem
+        payload = CreateUserSchema().load(request.get_json() or {})
+
         existing_user = User.query.filter(
-            (User.username == data['username']) | (User.email == data['email'])
+            (User.username == payload['username']) | (User.email == payload['email'])
         ).first()
-        
         if existing_user:
             return jsonify({'error': 'Username or email already exists'}), 400
-        
-        # Validar role
-        try:
-            role = UserRole(data['role'])
-        except ValueError:
-            return jsonify({'error': 'Invalid role'}), 400
-        
-        user = User(
-            username=data['username'],
-            email=data['email'],
-            full_name=data['full_name'],
-            role=role,
-            phone=data.get('phone'),
-            document=data.get('document'),
-            birth_date=datetime.fromisoformat(data['birth_date']) if data.get('birth_date') else None,
-            bank_name=data.get('bank_name'),
-            bank_agency=data.get('bank_agency'),
-            bank_account=data.get('bank_account'),
-            pix_key=data.get('pix_key'),
-            reta_id=data.get('reta_id')
-        )
-        
-        user.set_password(data['password'])
-        db.session.add(user)
-        db.session.commit()
-        
+
+        user = UserService.create(CreateUserDTO(
+            username=payload['username'],
+            email=payload['email'],
+            password=payload['password'],
+            full_name=payload['full_name'],
+            role=payload['role'],
+            phone=payload.get('phone'),
+            document=payload.get('document'),
+            birth_date=payload.get('birth_date'),
+            bank_name=payload.get('bank_name'),
+            bank_agency=payload.get('bank_agency'),
+            bank_account=payload.get('bank_account'),
+            pix_key=payload.get('pix_key'),
+            reta_id=payload.get('reta_id')
+        ))
+
         return jsonify({
             'message': 'User created successfully',
             'user': user.to_dict()
@@ -137,6 +158,8 @@ def get_user(user_id):
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @login_required
+@csrf_protect
+@audit_action('user_updated', 'User', include_body=True)
 def update_user(user_id):
     try:
         current_user = User.query.get(session['user_id'])
@@ -150,55 +173,72 @@ def update_user(user_id):
         if current_user.role != UserRole.ADMIN and current_user.id != user_id:
             return jsonify({'error': 'Access denied'}), 403
         
-        data = request.get_json()
+        payload = UpdateUserSchema().load(request.get_json() or {})
         
-        # Campos que podem ser atualizados
-        if 'full_name' in data:
-            user.full_name = data['full_name']
-        
-        if 'email' in data and data['email'] != user.email:
-            # Verificar se email já existe
-            existing_user = User.query.filter(User.email == data['email'], User.id != user_id).first()
+        # Verificar email único se fornecido
+        if 'email' in payload and payload['email'] and payload['email'] != user.email:
+            existing_user = User.query.filter(User.email == payload['email'], User.id != user_id).first()
             if existing_user:
                 return jsonify({'error': 'Email already exists'}), 400
-            user.email = data['email']
         
-        if 'phone' in data:
-            user.phone = data['phone']
+        # Sanitizar campos de texto livre
+        if payload.get('document'):
+            payload['document'] = bleach.clean(payload['document'], tags=[], strip=True)
+        if payload.get('bank_name'):
+            payload['bank_name'] = bleach.clean(payload['bank_name'], tags=[], strip=True)
+        if payload.get('bank_agency'):
+            payload['bank_agency'] = bleach.clean(payload['bank_agency'], tags=[], strip=True)
+        if payload.get('bank_account'):
+            payload['bank_account'] = bleach.clean(payload['bank_account'], tags=[], strip=True)
+        if payload.get('pix_key'):
+            payload['pix_key'] = bleach.clean(payload['pix_key'], tags=[], strip=True)
         
-        if 'document' in data:
-            user.document = data['document']
+        # Verificar mudança de reta
+        reta_changed = False
+        old_reta_id = user.reta_id
+        if current_user.role == UserRole.ADMIN and payload.get('reta_id') is not None:
+            if payload['reta_id'] != user.reta_id:
+                reta_changed = True
         
-        if 'birth_date' in data and data['birth_date']:
-            user.birth_date = datetime.fromisoformat(data['birth_date'])
+        # Usar serviço para atualizar
+        user = UserService.update(UpdateUserDTO(
+            user_id=user_id,
+            full_name=payload.get('full_name'),
+            phone=payload.get('phone'),
+            document=payload.get('document'),
+            birth_date=payload.get('birth_date'),
+            bank_name=payload.get('bank_name'),
+            bank_agency=payload.get('bank_agency'),
+            bank_account=payload.get('bank_account'),
+            pix_key=payload.get('pix_key'),
+            reta_id=payload.get('reta_id') if current_user.role == UserRole.ADMIN else None
+        ))
         
-        if 'bank_name' in data:
-            user.bank_name = data['bank_name']
-        
-        if 'bank_agency' in data:
-            user.bank_agency = data['bank_agency']
-        
-        if 'bank_account' in data:
-            user.bank_account = data['bank_account']
-        
-        if 'pix_key' in data:
-            user.pix_key = data['pix_key']
-        
-        # Apenas admins podem alterar reta e role
-        if current_user.role == UserRole.ADMIN:
-            if 'reta_id' in data:
-                user.reta_id = data['reta_id']
-            
-            if 'role' in data:
-                try:
-                    user.role = UserRole(data['role'])
-                except ValueError:
-                    return jsonify({'error': 'Invalid role'}), 400
-        
-        if 'password' in data and data['password']:
-            user.set_password(data['password'])
-        
-        db.session.commit()
+        # T2.3.2 - Notificar jogador sobre mudança de reta
+        if reta_changed:
+            try:
+                from src.utils.notification_service import get_notification_service
+                from src.routes.sse import broadcast_to_user
+                
+                notification_service = get_notification_service()
+                notification_service.create_notification(
+                    user_id=user.id,
+                    title="Reta alterada",
+                    message=f"Sua reta foi alterada pelo administrador",
+                    category="system",
+                    is_urgent=True
+                )
+                
+                # SSE para atualização imediata
+                broadcast_to_user(user.id, 'reta_changed', {
+                    'user_id': user.id,
+                    'old_reta_id': old_reta_id,
+                    'new_reta_id': user.reta_id,
+                    'message': 'Sua reta foi alterada',
+                    'timestamp': datetime.utcnow().timestamp()
+                })
+            except Exception as e:
+                print(f"Erro ao notificar mudança de reta: {e}")
         
         return jsonify({
             'message': 'User updated successfully',
@@ -228,6 +268,7 @@ def get_player_data(user_id):
 
 @users_bp.route('/<int:user_id>/player-data', methods=['POST', 'PUT'])
 @login_required
+@csrf_protect
 def update_player_data(user_id):
     try:
         current_user = User.query.get(session['user_id'])
@@ -405,27 +446,98 @@ def get_bankroll_history(user_id):
         days_back = request.args.get('days', 30, type=int)
         start_date = datetime.utcnow() - timedelta(days=days_back)
         
-        # Buscar transações do período
-        transactions = Transaction.query.filter(
-            Transaction.user_id == user_id,
-            Transaction.created_at >= start_date
-        ).order_by(Transaction.created_at).all()
+        # Buscar todas as contas do usuário
+        user_accounts = Account.query.filter_by(user_id=user_id, is_active=True).all()
+        account_ids = [acc.id for acc in user_accounts]
         
-        # Calcular evolução do bankroll
-        history = []
-        running_balance = 0
+        if not account_ids:
+            return jsonify({'history': [], 'period_days': days_back}), 200
         
-        for transaction in transactions:
-            if transaction.transaction_type in [TransactionType.PROFIT, TransactionType.LOSS]:
-                running_balance += float(transaction.amount)
+        # ✅ CORRIGIDO: Sempre usar dados reais, nunca fictícios
+        # Se não há histórico, retornar dados vazios ou saldo atual apenas
+        balance_history_exists = BalanceHistory.query.filter(BalanceHistory.account_id.in_(account_ids)).first()
+        
+        if not balance_history_exists:
+            # ✅ MELHORADO: Criar histórico baseado no saldo atual + pontos dos últimos 7 dias
+            current_balance = sum(float(acc.current_balance or 0) for acc in user_accounts)
             
-            history.append({
-                'date': transaction.created_at.isoformat(),
-                'amount': float(transaction.amount),
-                'type': transaction.transaction_type.value,
-                'balance': running_balance,
-                'description': transaction.description
-            })
+            history = []
+            # Criar pontos dos últimos 7 dias para dar contexto visual
+            for i in range(7):
+                date = (datetime.utcnow() - timedelta(days=6-i)).date()
+                # Saldo atual nos últimos dias (sem variação fictícia, apenas saldo real)
+                history.append({
+                    'date': date.isoformat(),
+                    'balance': current_balance,
+                    'change': 0
+                })
+                
+            # ✅ IMPORTANTE: Criar entrada inicial de BalanceHistory para futuras atualizações
+            try:
+                for acc in user_accounts:
+                    existing_history = BalanceHistory.query.filter_by(account_id=acc.id).first()
+                    if not existing_history:
+                        # Criar primeira entrada de histórico
+                        initial_history = BalanceHistory(
+                            account_id=acc.id,
+                            old_balance=acc.current_balance,
+                            new_balance=acc.current_balance,
+                            change_reason='initial_state',
+                            notes='Estado inicial da conta',
+                            changed_by=1  # Admin system
+                        )
+                        db.session.add(initial_history)
+                db.session.commit()
+                print(f"✅ Histórico inicial criado para jogador {user_id}")
+            except Exception as e:
+                print(f"Aviso: Erro ao criar histórico inicial: {e}")
+                db.session.rollback()
+            
+        else:
+            # ✅ CORRIGIDO: Buscar TODAS as alterações de saldo, não só 'close_day'
+            # Isso mostrará a evolução real baseada em todas as atualizações
+            balance_history = BalanceHistory.query.filter(
+                BalanceHistory.account_id.in_(account_ids),
+                BalanceHistory.created_at >= start_date
+            ).order_by(BalanceHistory.created_at).all()
+            
+            # Calcular saldo total acumulativo por data
+            daily_balances = {}
+            running_total = 0
+            
+            # Pegar saldo inicial (antes do período)
+            initial_balances = {}
+            for acc in user_accounts:
+                last_balance_before = BalanceHistory.query.filter(
+                    BalanceHistory.account_id == acc.id,
+                    BalanceHistory.created_at < start_date
+                ).order_by(BalanceHistory.created_at.desc()).first()
+                
+                if last_balance_before:
+                    initial_balances[acc.id] = float(last_balance_before.new_balance)
+                else:
+                    initial_balances[acc.id] = float(acc.current_balance or 0)
+            
+            running_total = sum(initial_balances.values())
+            
+            for bh in balance_history:
+                date_key = bh.created_at.date().isoformat()
+                if date_key not in daily_balances:
+                    daily_balances[date_key] = running_total
+                
+                # Atualizar o saldo com a mudança
+                change = float(bh.new_balance) - float(bh.old_balance)
+                daily_balances[date_key] += change
+                running_total += change
+            
+            # Converter para lista ordenada
+            history = []
+            for date_str in sorted(daily_balances.keys()):
+                history.append({
+                    'date': date_str,
+                    'balance': daily_balances[date_str],
+                    'change': 0
+                })
         
         return jsonify({
             'history': history,

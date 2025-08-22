@@ -90,6 +90,36 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
+    def set_pix_key(self, pix_key):
+        """Definir PIX criptografado"""
+        if pix_key:
+            from src.utils.encryption import encrypt_bank_data
+            self.pix_key = encrypt_bank_data(pix_key)
+        else:
+            self.pix_key = None
+    
+    def get_pix_key(self):
+        """Obter PIX descriptografado"""
+        if self.pix_key:
+            from src.utils.encryption import decrypt_bank_data
+            return decrypt_bank_data(self.pix_key)
+        return None
+    
+    def set_bank_account(self, account):
+        """Definir conta bancária criptografada"""
+        if account:
+            from src.utils.encryption import encrypt_bank_data
+            self.bank_account = encrypt_bank_data(account)
+        else:
+            self.bank_account = None
+    
+    def get_bank_account(self):
+        """Obter conta bancária descriptografada"""
+        if self.bank_account:
+            from src.utils.encryption import decrypt_bank_data
+            return decrypt_bank_data(self.bank_account)
+        return None
+    
     def to_dict(self, include_sensitive=False):
         data = {
             'id': self.id,
@@ -112,10 +142,21 @@ class User(db.Model):
         if include_sensitive:
             data.update({
                 'document': self.document,
-                'pix_key': self.pix_key,
+                'pix_key': self.get_pix_key(),  # Descriptografar para exibição
                 'bank_name': self.bank_name,
                 'bank_agency': self.bank_agency,
-                'bank_account': self.bank_account,
+                'bank_account': self.get_bank_account(),  # Descriptografar para exibição
+                'two_factor_enabled': self.two_factor_enabled
+            })
+        else:
+            # Dados mascarados para logs/API geral
+            from src.utils.encryption import mask_sensitive_data
+            data.update({
+                'document': mask_sensitive_data(self.document or "", visible_chars=2),
+                'pix_key': mask_sensitive_data(self.get_pix_key() or "", visible_chars=4),
+                'bank_name': self.bank_name,  # Nome do banco não é sensível
+                'bank_agency': mask_sensitive_data(self.bank_agency or "", visible_chars=2),
+                'bank_account': mask_sensitive_data(self.get_bank_account() or "", visible_chars=3),
                 'two_factor_enabled': self.two_factor_enabled
             })
         
@@ -148,8 +189,8 @@ class Account(db.Model):
     __tablename__ = 'accounts'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False, index=True)
     account_name = db.Column(db.String(100), nullable=False)
     
     # Campos da planilha
@@ -157,9 +198,14 @@ class Account(db.Model):
     current_balance = db.Column(Numeric(10, 2), default=0.00)  # Banca atual
     total_reloads = db.Column(Numeric(10, 2), default=0.00)
     total_withdrawals = db.Column(Numeric(10, 2), default=0.00)
+    # ✅ Campos para investimento e reload manual do time
+    manual_team_investment = db.Column(Numeric(10, 2), default=None)
+    investment_notes = db.Column(db.Text)
+    manual_reload_amount = db.Column(Numeric(10, 2), default=None)
+    reload_notes = db.Column(db.Text)
     
     # Status da conta
-    status = db.Column(db.Enum(AccountStatus), default=AccountStatus.INACTIVE)
+    status = db.Column(db.Enum(AccountStatus), default=AccountStatus.INACTIVE, index=True)
     has_account = db.Column(db.Boolean, default=False)  # Se tem conta na plataforma
     
     # Controle de atualizações
@@ -178,22 +224,24 @@ class Account(db.Model):
         """
         Calcula o P&L (Profit & Loss) da conta.
         
-        Lógica correta:
-        - Luxon: Sempre 0 (é conta de transferência do time)
-        - Sites de poker: current_balance - valor_transferido_da_luxon
+        Lógica correta conforme ABA Administrador_.md:
+        - Luxon: Sempre 0 (não entra no P&L, é apenas carteira de transferência)
+        - Sites de poker: current_balance - initial_balance
         
-        Para sites, o initial_balance deve ser 0 (não contamos como investimento),
-        o P&L é puramente current_balance (que reflete ganhos/perdas das sessões).
+        Exemplo: Time deposita $100 na Luxon → Player distribui: GG $50, PS $30
+        Após jogo: GG $100, PS $25
+        P&L = (100-50) + (25-30) = +$45 (Luxon NÃO entra)
         """
         if self.platform and self.platform.name.lower() == 'luxon':
-            return 0.00  # Luxon não gera P&L, apenas transfere
+            return 0.00  # Luxon NÃO entra no P&L
         
         if not self.has_account:
             return 0.00
             
-        # Para sites de poker: P&L = saldo atual (que reflete sessões de jogo)
-        # O initial_balance dos sites deve ser 0, pois o investimento real vem da Luxon
-        return float(self.current_balance) if self.current_balance else 0.00
+        # Para sites de poker: P&L = current_balance - initial_balance
+        current = float(self.current_balance) if self.current_balance else 0.00
+        initial = float(self.initial_balance) if self.initial_balance else 0.00
+        return current - initial
     
     @property
     def needs_update(self):
@@ -215,6 +263,11 @@ class Account(db.Model):
             'pnl': self.pnl,
             'total_reloads': float(self.total_reloads),
             'total_withdrawals': float(self.total_withdrawals),
+            # ✅ Campos manual investment e reload
+            'manual_team_investment': float(self.manual_team_investment) if self.manual_team_investment else None,
+            'investment_notes': self.investment_notes,
+            'manual_reload_amount': float(self.manual_reload_amount) if self.manual_reload_amount else None,
+            'reload_notes': self.reload_notes,
             'status': self.status.value,
             'has_account': self.has_account,
             'last_balance_update': self.last_balance_update.isoformat() if self.last_balance_update else None,
@@ -229,15 +282,18 @@ class ReloadRequest(db.Model):
     __tablename__ = 'reload_requests'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False, index=True)
     amount = db.Column(Numeric(10, 2), nullable=False)
-    status = db.Column(db.Enum(ReloadStatus), default=ReloadStatus.PENDING)
+    status = db.Column(db.Enum(ReloadStatus), default=ReloadStatus.PENDING, index=True)
+    # 🚨 TEMPORÁRIO: Comentar até migration ser aplicada
+    # paid_back = db.Column(db.Boolean, default=False, index=True)
+    # paid_back_at = db.Column(db.DateTime)
     player_notes = db.Column(db.Text)
     manager_notes = db.Column(db.Text)
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     approved_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamento para o usuário que aprovou
@@ -252,6 +308,9 @@ class ReloadRequest(db.Model):
             'platform_name': self.platform.display_name if self.platform else None,
             'amount': float(self.amount),
             'status': self.status.value,
+            # 🚨 TEMPORÁRIO: Comentar até migration
+            # 'paid_back': self.paid_back,
+            # 'paid_back_at': self.paid_back_at.isoformat() if self.paid_back_at else None,
             'player_notes': self.player_notes,
             'manager_notes': self.manager_notes,
             'approved_by': self.approved_by,
@@ -265,14 +324,14 @@ class Transaction(db.Model):
     __tablename__ = 'transactions'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False)
-    transaction_type = db.Column(db.Enum(TransactionType), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False, index=True)
+    transaction_type = db.Column(db.Enum(TransactionType), nullable=False, index=True)
     amount = db.Column(Numeric(10, 2), nullable=False)
     description = db.Column(db.String(255))
     reload_request_id = db.Column(db.Integer, db.ForeignKey('reload_requests.id'))
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     # Relacionamentos
     reload_request = db.relationship('ReloadRequest', backref='transactions')
@@ -391,16 +450,16 @@ class WithdrawalRequest(db.Model):
     __tablename__ = 'withdrawal_requests'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    platform_id = db.Column(db.Integer, db.ForeignKey('platforms.id'), nullable=False, index=True)
     amount = db.Column(Numeric(10, 2), nullable=False)
-    status = db.Column(db.Enum(WithdrawalStatus), default=WithdrawalStatus.PENDING)
+    status = db.Column(db.Enum(WithdrawalStatus), default=WithdrawalStatus.PENDING, index=True)
     player_notes = db.Column(db.Text)
     manager_notes = db.Column(db.Text)
     approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     approved_at = db.Column(db.DateTime)
     completed_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relacionamentos
@@ -431,7 +490,7 @@ class Document(db.Model):
     __tablename__ = 'documents'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(500), nullable=False)
@@ -447,12 +506,12 @@ class Document(db.Model):
     withdrawal_request_id = db.Column(db.Integer, db.ForeignKey('withdrawal_requests.id'))  # Se for comprovante de saque
     
     # Status de verificação
-    status = db.Column(db.Enum(DocumentStatus), default=DocumentStatus.PENDING)
+    status = db.Column(db.Enum(DocumentStatus), default=DocumentStatus.PENDING, index=True)
     verified_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     verified_at = db.Column(db.DateTime)
     verification_notes = db.Column(db.Text)
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     # Relacionamentos
     account = db.relationship('Account')
@@ -486,14 +545,14 @@ class BalanceHistory(db.Model):
     __tablename__ = 'balance_history'
     
     id = db.Column(db.Integer, primary_key=True)
-    account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False)
+    account_id = db.Column(db.Integer, db.ForeignKey('accounts.id'), nullable=False, index=True)
     old_balance = db.Column(Numeric(10, 2), nullable=False)
     new_balance = db.Column(Numeric(10, 2), nullable=False)
     change_reason = db.Column(db.String(100))  # 'manual_update', 'reload', 'withdrawal', etc.
     notes = db.Column(db.Text)
-    changed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    changed_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id'))  # Comprovante associado
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     # Relacionamentos
     account = db.relationship('Account')
@@ -525,15 +584,15 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    action = db.Column(db.String(100), nullable=False)  # 'user_created', 'balance_updated', etc.
-    entity_type = db.Column(db.String(50), nullable=False)  # 'User', 'Account', 'ReloadRequest', etc.
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    action = db.Column(db.String(100), nullable=False, index=True)  # 'user_created', 'balance_updated', etc.
+    entity_type = db.Column(db.String(50), nullable=False, index=True)  # 'User', 'Account', 'ReloadRequest', etc.
     entity_id = db.Column(db.Integer, nullable=False)  # ID da entidade afetada
     old_values = db.Column(db.Text)  # JSON com valores antigos
     new_values = db.Column(db.Text)  # JSON com valores novos
     ip_address = db.Column(db.String(45))  # IP do usuário
     user_agent = db.Column(db.String(500))  # User agent do browser
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     
     # Relacionamento
     user = db.relationship('User')
@@ -623,5 +682,59 @@ class PlayerFieldValue(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'updated_by': self.updated_by,
             'updater_name': self.updater.full_name if self.updater else None
+        }
+
+class TeamMonthlySnapshot(db.Model):
+    """Snapshots mensais do saldo total do time para controle histórico"""
+    __tablename__ = 'team_monthly_snapshots'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    month = db.Column(db.Integer, nullable=False)  # 1-12
+    year = db.Column(db.Integer, nullable=False)   # 2024, 2025, etc
+    
+    # Dados financeiros do time no fechamento do mês
+    total_balance = db.Column(Numeric(10, 2), default=0)  # Saldo total consolidado
+    total_pnl = db.Column(Numeric(10, 2), default=0)      # P&L consolidado do mês
+    total_investment = db.Column(Numeric(10, 2), default=0) # Total investido pelo time
+    
+    # Estatísticas do time
+    active_players = db.Column(db.Integer, default=0)
+    total_accounts = db.Column(db.Integer, default=0)
+    profitable_players = db.Column(db.Integer, default=0)
+    players_in_makeup = db.Column(db.Integer, default=0)
+    
+    # Controle operacional
+    is_closed = db.Column(db.Boolean, default=False)  # Mês fechado/finalizado
+    closed_by = db.Column(db.Integer, db.ForeignKey('users.id'))  # Quem fechou
+    notes = db.Column(db.Text)  # Observações do fechamento
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    closed_by_user = db.relationship('User', backref=db.backref('monthly_closures', lazy=True))
+    
+    # Unique constraint para garantir um snapshot por mês/ano
+    __table_args__ = (db.UniqueConstraint('month', 'year', name='unique_month_year'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'month': self.month,
+            'year': self.year,
+            'period': f"{self.year}-{self.month:02d}",
+            'total_balance': float(self.total_balance),
+            'total_pnl': float(self.total_pnl),
+            'total_investment': float(self.total_investment),
+            'active_players': self.active_players,
+            'total_accounts': self.total_accounts,
+            'profitable_players': self.profitable_players,
+            'players_in_makeup': self.players_in_makeup,
+            'is_closed': self.is_closed,
+            'closed_by': self.closed_by,
+            'closed_by_name': self.closed_by_user.full_name if self.closed_by_user else None,
+            'notes': self.notes,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 

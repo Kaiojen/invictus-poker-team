@@ -15,6 +15,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { useSSE } from "../hooks/useSSE";
 
 const formatUSD = (value) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -26,45 +27,73 @@ const TeamProfitChart = ({ days = 30, refreshMs = 60000 }) => {
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState({ totalBalance: 0, monthlyProfit: 0 });
 
+  // ✅ CONECTAR ao SSE para atualizações em tempo real
+  const { addEventListener } = useSSE();
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Resumo geral (saldo total e lucro mensal) para bater com cards da planilha
+      const teamRes = await fetch("/api/dashboard/team-financials", {
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+      if (teamRes.ok) {
+        const team = await teamRes.json();
+        console.log("Team financials data:", team); // Debug log
+        setSummary({
+          totalBalance: team.totalBalance || 0,
+          monthlyProfit: team.monthlyProfit || 0,
+        });
+      } else {
+        console.error(
+          "Error fetching team financials:",
+          teamRes.status,
+          teamRes.statusText
+        );
+      }
+
+      const res = await fetch(`/api/dashboard/team-pnl-series?days=${days}`, {
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        console.log("Team P&L series data:", json); // Debug log
+        const series = (json.series || []).map((d) => ({
+          date: d.date,
+          pnl: d.delta,
+          cumulative: d.cumulative,
+          dateFormatted: new Date(d.date).toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+          }),
+        }));
+        setData(series);
+      } else {
+        console.error(
+          "Error fetching team P&L series:",
+          res.status,
+          res.statusText
+        );
+      }
+    } catch (e) {
+      console.error("Erro ao carregar dados de P&L do time", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Carregar dados inicial e configurar refresh automático
   useEffect(() => {
     let timer;
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Resumo geral (saldo total e lucro mensal) para bater com cards da planilha
-        const teamRes = await fetch("/api/dashboard/team-financials", {
-          credentials: "include",
-        });
-        if (teamRes.ok) {
-          const team = await teamRes.json();
-          setSummary({
-            totalBalance: team.totalBalance || 0,
-            monthlyProfit: team.monthlyProfit || 0,
-          });
-        }
 
-        const res = await fetch(`/api/dashboard/team-pnl-series?days=${days}`, {
-          credentials: "include",
-        });
-        if (res.ok) {
-          const json = await res.json();
-          const series = (json.series || []).map((d) => ({
-            date: d.date,
-            pnl: d.delta,
-            cumulative: d.cumulative,
-            dateFormatted: new Date(d.date).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-            }),
-          }));
-          setData(series);
-        }
-      } catch (e) {
-        console.error("Erro ao carregar dados de P&L do time", e);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
     if (refreshMs > 0) {
       timer = setInterval(fetchData, refreshMs);
@@ -73,6 +102,33 @@ const TeamProfitChart = ({ days = 30, refreshMs = 60000 }) => {
       if (timer) clearInterval(timer);
     };
   }, [days, refreshMs]);
+
+  // ✅ CONECTAR aos eventos SSE para atualização em tempo real
+  useEffect(() => {
+    if (!addEventListener) return;
+
+    const removeBalanceListener = addEventListener(
+      "balance_updated",
+      (data) => {
+        console.log("TeamProfitChart: Saldo atualizado via SSE", data);
+        // ✅ ATUALIZAÇÃO INSTANTÂNEA: Sem delay para mostrar evolução em tempo real
+        fetchData();
+      }
+    );
+
+    const removeDashboardRefreshListener = addEventListener(
+      "dashboard_refresh",
+      () => {
+        console.log("TeamProfitChart: Dashboard refresh via SSE");
+        fetchData();
+      }
+    );
+
+    return () => {
+      removeBalanceListener?.();
+      removeDashboardRefreshListener?.();
+    };
+  }, [addEventListener]);
 
   return (
     <Card>

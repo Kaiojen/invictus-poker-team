@@ -55,7 +55,7 @@ const NotificationBell = ({ onOpenCenter }) => {
 
   const fetchRecentNotifications = async () => {
     try {
-      const response = await fetch("/api/notifications?limit=5", {
+      const response = await fetch("/api/notifications/?limit=5", {
         credentials: "include",
       });
 
@@ -115,15 +115,44 @@ const NotificationBell = ({ onOpenCenter }) => {
   const getNotificationIcon = (type) => {
     switch (type) {
       case "success":
-        return <CheckCircle className="w-3 h-3 text-emerald-500" />;
+        return (
+          <CheckCircle className="w-3 h-3 text-green-600 dark:text-green-400" />
+        );
       case "warning":
-        return <AlertTriangle className="w-3 h-3 text-amber-500" />;
+        return (
+          <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+        );
       case "error":
-        return <XCircle className="w-3 h-3 text-rose-500" />;
+        return <XCircle className="w-3 h-3 text-red-600 dark:text-red-400" />;
       case "urgent":
-        return <Zap className="w-3 h-3 text-amber-500" />;
+        return <Zap className="w-3 h-3 text-amber-600 dark:text-amber-400" />;
       default:
-        return <Info className="w-3 h-3 text-blue-400" />;
+        return <Info className="w-3 h-3 text-blue-600 dark:text-blue-400" />;
+    }
+  };
+
+  const deleteNotification = async (notificationId) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (response.ok) {
+        setRecentNotifications((prev) =>
+          prev.filter((n) => n.id !== notificationId)
+        );
+        const deleted = recentNotifications.find(
+          (n) => n.id === notificationId
+        );
+        if (deleted && !deleted.is_read) {
+          setStats((prev) => ({
+            ...prev,
+            unread: Math.max(0, prev.unread - 1),
+          }));
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao excluir notificação:", e);
     }
   };
 
@@ -132,7 +161,17 @@ const NotificationBell = ({ onOpenCenter }) => {
       await markAsRead(notification.id);
     }
 
-    if (notification.action_url) {
+    // ✅ NAVEGAÇÃO INTELIGENTE PARA APROVAÇÕES
+    if (
+      notification.category === "REGISTRATION" ||
+      notification.title.includes("Novo Cadastro")
+    ) {
+      // Navegar para área de aprovações
+      const customEvent = new CustomEvent("navigate-to-approval", {
+        detail: { userId: notification.related_entity_id },
+      });
+      window.dispatchEvent(customEvent);
+    } else if (notification.action_url) {
       window.location.href = notification.action_url;
     }
   };
@@ -182,9 +221,9 @@ const NotificationBell = ({ onOpenCenter }) => {
                     key={notification.id}
                     className={`px-4 py-3 cursor-pointer ${
                       !notification.is_read
-                        ? "bg-blue-50 dark:bg-blue-950/20"
-                        : ""
-                    }`}
+                        ? "bg-primary/5 dark:bg-primary/10 border-l-2 border-primary"
+                        : "hover:bg-muted/30"
+                    } transition-colors`}
                     onClick={() => handleNotificationClick(notification)}
                   >
                     <div className="flex items-start space-x-3 w-full">
@@ -205,7 +244,7 @@ const NotificationBell = ({ onOpenCenter }) => {
                           </p>
 
                           {notification.is_urgent && (
-                            <Zap className="w-3 h-3 text-orange-500 flex-shrink-0 ml-1" />
+                            <Zap className="w-3 h-3 text-red-500 flex-shrink-0 ml-1" />
                           )}
                         </div>
 
@@ -213,13 +252,24 @@ const NotificationBell = ({ onOpenCenter }) => {
                           {notification.message}
                         </p>
 
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {notification.time_ago}
-                        </p>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {notification.time_ago}
+                          </p>
+                          <button
+                            className="text-[10px] text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNotification(notification.id);
+                            }}
+                          >
+                            Remover
+                          </button>
+                        </div>
                       </div>
 
                       {!notification.is_read && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
+                        <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-2" />
                       )}
                     </div>
                   </DropdownMenuItem>
@@ -240,6 +290,27 @@ const NotificationBell = ({ onOpenCenter }) => {
                     Marcar todas como lidas
                   </DropdownMenuItem>
                 )}
+
+                <DropdownMenuItem
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/notifications/clear-read", {
+                        method: "DELETE",
+                        credentials: "include",
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setRecentNotifications((prev) =>
+                          prev.filter((n) => !n.is_read)
+                        );
+                        fetchStats();
+                      }
+                    } catch {}
+                  }}
+                  className="flex-1 justify-center text-xs"
+                >
+                  Limpar lidas
+                </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={onOpenCenter}

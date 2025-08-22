@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from datetime import datetime
 from src.models.models import User
-from src.models.notifications import Notification, UserNotificationSettings
+from src.models.notifications import Notification, UserNotificationSettings, NotificationType, NotificationCategory
 from src.routes.auth import login_required, admin_required
 from src.utils.notification_service import get_notification_service
 import logging
@@ -75,6 +75,34 @@ def mark_all_notifications_read():
         
     except Exception as e:
         logger.error(f"Erro ao marcar todas como lidas: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@notifications_bp.route('/<int:notification_id>', methods=['DELETE'])
+@login_required
+def delete_notification(notification_id):
+    """Excluir notificação do usuário autenticado"""
+    try:
+        user_id = session['user_id']
+        notification_service = get_notification_service()
+        success = notification_service.delete_notification(notification_id, user_id)
+        if success:
+            return jsonify({'message': 'Notification deleted'}), 200
+        return jsonify({'error': 'Notification not found'}), 404
+    except Exception as e:
+        logger.error(f"Erro ao excluir notificação: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@notifications_bp.route('/clear-read', methods=['DELETE'])
+@login_required
+def clear_read_notifications():
+    """Excluir todas as notificações já lidas do usuário"""
+    try:
+        user_id = session['user_id']
+        notification_service = get_notification_service()
+        count = notification_service.clear_read_notifications(user_id)
+        return jsonify({'message': f'{count} notifications deleted', 'count': count}), 200
+    except Exception as e:
+        logger.error(f"Erro ao limpar notificações lidas: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @notifications_bp.route('/settings', methods=['GET'])
@@ -155,8 +183,8 @@ def create_test_notification():
             user_id=user_id,
             title="🧪 Notificação de Teste",
             message="Esta é uma notificação de teste do sistema Invictus Poker Team.",
-            notification_type="info",
-            category="system_message",
+            notification_type=NotificationType.INFO,
+            category=NotificationCategory.SYSTEM_MESSAGE,
             expires_hours=1
         )
         
@@ -186,6 +214,39 @@ def get_notification_stats():
         
     except Exception as e:
         logger.error(f"Erro ao obter estatísticas: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@notifications_bp.route('/debug', methods=['GET'])
+@login_required
+def debug_notifications():
+    """DEBUG: Verificar notificações diretamente no banco"""
+    try:
+        user_id = session['user_id']
+        
+        # Query direta no banco
+        all_notifications = Notification.query.filter(Notification.user_id == user_id).all()
+        unread_notifications = Notification.query.filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        ).all()
+        
+        return jsonify({
+            'user_id': user_id,
+            'all_count': len(all_notifications),
+            'unread_count': len(unread_notifications),
+            'all_notifications': [
+                {
+                    'id': notif.id,
+                    'title': notif.title,
+                    'is_read': notif.is_read,
+                    'expires_at': str(notif.expires_at) if notif.expires_at else None,
+                    'created_at': str(notif.created_at)
+                } 
+                for notif in all_notifications
+            ]
+        }), 200
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @notifications_bp.route('/urgent', methods=['GET'])

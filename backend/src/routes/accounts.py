@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from src.models.models import db, Account, User, Platform, UserRole
 from src.routes.auth import login_required, admin_required
+from src.utils.pagination import paginate_query
 
 accounts_bp = Blueprint('accounts', __name__)
 
@@ -16,14 +17,19 @@ def get_accounts():
             if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER] and current_user.id != user_id:
                 return jsonify({'error': 'Access denied'}), 403
             accounts = Account.query.filter_by(user_id=user_id, is_active=True).all()
+            return jsonify({'accounts': [account.to_dict() for account in accounts]}), 200
         else:
             # Admins/managers podem ver todas as contas, jogadores apenas as suas
             if current_user.role in [UserRole.ADMIN, UserRole.MANAGER]:
-                accounts = Account.query.filter_by(is_active=True).all()
+                query = Account.query.filter_by(is_active=True).order_by(Account.created_at.desc())
+                result = paginate_query(query, max_per_page=200)
+                return jsonify({
+                    'accounts': [account.to_dict() for account in result['items']],
+                    'pagination': result['pagination']
+                }), 200
             else:
                 accounts = Account.query.filter_by(user_id=current_user.id, is_active=True).all()
-        
-        return jsonify({'accounts': [account.to_dict() for account in accounts]}), 200
+                return jsonify({'accounts': [account.to_dict() for account in accounts]}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

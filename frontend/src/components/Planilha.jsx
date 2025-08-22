@@ -30,6 +30,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import CalendarTracker from "./CalendarTracker";
+import BankrollChart from "./BankrollChart";
+// 🚨 REMOVIDO: import NotificationTemplates - não usado mais
+import { toast } from "sonner";
 import {
   CheckCircle,
   Clock,
@@ -58,6 +61,9 @@ const Planilha = ({
   const [balanceNotes, setBalanceNotes] = useState("");
   const [uploadingDoc, setUploadingDoc] = useState(null);
   const [closingDay, setClosingDay] = useState(false);
+
+  // 🚨 SIMPLIFICADO: Apenas calendar e estados mínimos necessários
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // SSE para atualizações em tempo real
   const { addEventListener } = useSSE();
@@ -120,9 +126,122 @@ const Planilha = ({
     };
   }, [addEventListener, fetchPlanilhaData]);
 
+  // ✅ FUNÇÕES LIMPAS - SISTEMA DE TEMPLATE REMOVIDO
+
+  // Ações de solicitações
+  // 🚨 NOVO: Ações diretas sem modal de template
+  const handleReloadAction = async (reloadId, action) => {
+    const isApproval = action === "approve";
+    const confirmMessage = isApproval
+      ? "Aprovar esta solicitação de reload?"
+      : "Rejeitar esta solicitação de reload?";
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const response = await fetch(
+        `/api/reload-requests/${reloadId}/${action}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            manager_notes: isApproval
+              ? "Aprovado via planilha"
+              : "Rejeitado via planilha",
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        toast.success(
+          `Reload ${isApproval ? "aprovado" : "rejeitado"} com sucesso!`
+        );
+        fetchPlanilhaData();
+      } else {
+        const error = await response.json();
+        toast.error(`Erro ao ${action} reload`, {
+          description: error.message || "Erro desconhecido",
+        });
+      }
+    } catch (err) {
+      toast.error("Erro de conexão");
+    }
+  };
+
+  const handleWithdrawalAction = async (withdrawalId, action) => {
+    const isApproval = action === "approve";
+    const isComplete = action === "complete";
+
+    let confirmMessage;
+    if (isComplete) {
+      confirmMessage = "Marcar saque como concluído?";
+    } else {
+      confirmMessage = isApproval
+        ? "Aprovar esta solicitação de saque?"
+        : "Rejeitar esta solicitação de saque?";
+    }
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      const response = await fetch(
+        `/api/withdrawal-requests/${withdrawalId}/${action}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            manager_notes: isComplete
+              ? "Marcado como concluído via planilha"
+              : isApproval
+              ? "Aprovado via planilha"
+              : "Rejeitado via planilha",
+          }),
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const actionText = isComplete
+          ? "marcado como concluído"
+          : isApproval
+          ? "aprovado"
+          : "rejeitado";
+        toast.success(`Saque ${actionText} com sucesso!`);
+        fetchPlanilhaData();
+      } else {
+        const error = await response.json();
+        toast.error(`Erro ao ${action} saque`, {
+          description: error.message || "Erro desconhecido",
+        });
+      }
+    } catch (err) {
+      toast.error("Erro de conexão");
+    }
+  };
+
+  // ✅ FUNÇÃO PARA EDITAR SALDO - FUNCIONANDO
   const handleUpdateBalance = async (accountId) => {
+    console.log("💰 Botão de editar saldo clicado!");
+    console.log("🔧 Account ID:", accountId, "Novo saldo:", newBalance);
+
     if (!newBalance || parseFloat(newBalance) < 0) {
-      alert("Por favor, informe um saldo válido.");
+      toast.error("❌ Saldo inválido!", {
+        description: "Digite um valor válido maior ou igual a zero",
+      });
+      return;
+    }
+
+    const valorSaldo = parseFloat(newBalance);
+    const confirmAction = confirm(
+      `💰 ATUALIZAR SALDO\n\n` +
+        `Novo valor: ${formatCurrency(valorSaldo)}\n` +
+        `Observações: ${balanceNotes || "Atualização manual"}\n\n` +
+        `Confirma a atualização?`
+    );
+
+    if (!confirmAction) {
+      console.log("❌ Usuário cancelou a atualização de saldo");
       return;
     }
 
@@ -135,9 +254,9 @@ const Planilha = ({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            current_balance: parseFloat(newBalance),
+            new_balance: parseFloat(newBalance), // ✅ CORRIGIDO: usar new_balance
             notes: balanceNotes,
-            verified: userRole !== "player",
+            change_reason: "manual_update",
           }),
           credentials: "include",
         }
@@ -251,6 +370,202 @@ const Planilha = ({
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
+  // ✅ FUNÇÃO PARA EDITAR INVESTIMENTO - FUNCIONANDO
+  const handleEditInvestment = async () => {
+    console.log("🔧 Botão de editar investimento clicado!");
+
+    const valorAtual = planilhaData.summary?.total_investment || 0;
+    const novoValor = prompt(
+      `💰 Investimento Atual: ${formatCurrency(valorAtual)}\n\n` +
+        `Digite o novo valor total investido pelo time:`,
+      valorAtual
+    );
+
+    if (novoValor === null) {
+      console.log("❌ Usuário cancelou a edição");
+      return;
+    }
+
+    const valor = parseFloat(novoValor);
+    if (isNaN(valor) || valor < 0) {
+      toast.error("❌ Valor inválido!", {
+        description: "Digite um número válido maior que zero",
+      });
+      return;
+    }
+
+    const observacoes = prompt(
+      "📝 Observações sobre este investimento (opcional):",
+      "Investimento definido manualmente pelo admin"
+    );
+
+    console.log("✅ Novo investimento:", valor, "Obs:", observacoes);
+
+    try {
+      const response = await fetch(
+        `/api/team-investment/user/${userId}/manual`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            investment_amount: valor,
+            notes: observacoes,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        toast.success("✅ Investimento atualizado!", {
+          description: `Novo valor: ${formatCurrency(valor)}`,
+          duration: 3000,
+        });
+        fetchPlanilhaData(); // Recarregar dados para mostrar mudança
+      } else {
+        const errorData = await response.json();
+        toast.error("❌ Erro ao atualizar investimento", {
+          description: errorData.error || "Erro desconhecido",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar investimento:", error);
+      toast.error("❌ Erro de conexão", {
+        description: "Tente novamente em alguns instantes",
+      });
+    }
+  };
+
+  // ✅ NOVA FUNÇÃO: Editar Reloads Manualmente
+  const handleEditReloads = async () => {
+    const valor = parseFloat(
+      prompt(
+        "💳 EDITAR RELOADS TOTAL\n\n" +
+          `Valor atual: ${formatCurrency(
+            derived.approvedReloadsAmount || 0
+          )}\n\n` +
+          "Digite o novo valor total de reloads:",
+        String(derived.approvedReloadsAmount || 0)
+      ) || "0"
+    );
+
+    if (isNaN(valor) || valor < 0) {
+      toast.error("❌ Valor inválido!", {
+        description: "Digite um valor válido maior ou igual a zero",
+      });
+      return;
+    }
+
+    const observacoes = prompt(
+      "📝 Observações (opcional):",
+      "Reloads definidos manualmente pelo admin"
+    );
+
+    console.log("✅ Novo valor reloads:", valor, "Obs:", observacoes);
+
+    try {
+      const response = await fetch(
+        `/api/team-investment/user/${userId}/manual-reload`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            reload_amount: valor,
+            notes: observacoes,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        toast.success("✅ Reloads atualizados!", {
+          description: `Novo valor: ${formatCurrency(valor)}`,
+          duration: 3000,
+        });
+        fetchPlanilhaData(); // Recarregar dados para mostrar mudança
+      } else {
+        const errorData = await response.json();
+        toast.error("❌ Erro ao atualizar reloads", {
+          description: errorData.error || "Erro desconhecido",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar reloads:", error);
+      toast.error("❌ Erro de conexão", {
+        description: "Tente novamente em alguns instantes",
+      });
+    }
+  };
+
+  // ✅ FUNÇÃO PARA QUITAR RELOADS - FUNCIONANDO
+  const handlePaybackReloads = async () => {
+    console.log("💸 Botão de quitar reloads clicado!");
+    console.log("📊 Valor de reloads:", derived.approvedReloadsAmount);
+
+    if (!(derived.approvedReloadsAmount > 0)) {
+      console.log("❌ Nenhum reload para quitar");
+      toast.error("❌ Nenhum reload pendente para quitar");
+      return;
+    }
+
+    const valorReloads = formatCurrency(derived.approvedReloadsAmount);
+    const confirmAction = confirm(
+      `💸 QUITAR RELOADS\n\n` +
+        `Valor: ${valorReloads}\n\n` +
+        `⚠️ Esta ação irá:\n` +
+        `• Deduzir o valor das contas do jogador\n` +
+        `• Reduzir o investimento do time\n` +
+        `• Permitir que o jogador solicite saques\n\n` +
+        `Confirma a quitação?`
+    );
+
+    if (!confirmAction) {
+      console.log("❌ Usuário cancelou a quitação");
+      return;
+    }
+
+    console.log("✅ Quitação confirmada!");
+
+    try {
+      const response = await fetch("/api/reload-payback/payback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          user_id: userId,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success("✅ Reload quitado com sucesso!", {
+          description: `${valorReloads} foi processado`,
+          duration: 3000,
+        });
+        fetchPlanilhaData(); // Recarregar dados para mostrar mudança
+      } else {
+        const errorData = await response.json();
+        toast.error("❌ Erro ao quitar reload", {
+          description: errorData.error || "Erro desconhecido",
+        });
+      }
+    } catch (error) {
+      console.error("Erro ao quitar reload:", error);
+      toast.error("❌ Erro de conexão", {
+        description: "Tente novamente em alguns instantes",
+      });
+    }
+
+    // 🚨 CÓDIGO REMOVIDO - API IMPLEMENTADA ACIMA:
+    //   body: JSON.stringify({ user_id: userId })
+    // }).then(() => fetchPlanilhaData())
+  };
+
   const handleCloseDay = async () => {
     try {
       setClosingDay(true);
@@ -290,6 +605,68 @@ const Planilha = ({
     );
   }
 
+  // Ordem canônica de plataformas: PS → GG → YA → PP → 888 → Luxon (Luxon por último)
+  const normalizePlatformKey = (name) => {
+    const n = String(name || "").toLowerCase();
+    if (n.includes("pokerstars") || n === "ps") return "ps";
+    if (n.includes("gg")) return "gg";
+    if (n.includes("ya")) return "ya";
+    if (n.includes("party") || n.includes("pp")) return "pp";
+    if (n.includes("888")) return "888";
+    if (n.includes("luxon")) return "luxon";
+    return n || "other";
+  };
+
+  const canonicalOrder = ["ps", "gg", "ya", "pp", "888", "luxon", "other"];
+
+  const sortedAccounts = (
+    planilhaData.all_platform_accounts ||
+    planilhaData.accounts ||
+    []
+  )
+    .slice()
+    .sort((a, b) => {
+      const ak = normalizePlatformKey(a.platform_name);
+      const bk = normalizePlatformKey(b.platform_name);
+      const ai = canonicalOrder.indexOf(ak);
+      const bi = canonicalOrder.indexOf(bk);
+      return ai - bi;
+    });
+
+  // 🚨 CORREÇÃO CRÍTICA: Usar dados corretos do backend que já inclui lógica de reloads
+  const derived = (() => {
+    // Backend já calcula P&L correto (saldo atual - investimento total com reloads)
+    const pnl = Number(planilhaData.summary?.total_pnl || 0);
+
+    // Backend já calcula saldo total (inclui Luxon)
+    const totalBalance = Number(
+      planilhaData.summary?.total_current_balance || 0
+    );
+
+    // Backend já calcula investimento total (inicial + reloads aprovados)
+    const totalInvestment = Number(planilhaData.summary?.total_investment || 0);
+
+    // Reloads pendentes (ainda não aprovados) somados ao investimento
+    const pendingReloadsSum = (
+      planilhaData.pending_requests?.reloads || []
+    ).reduce((s, r) => s + Number(r.amount || 0), 0);
+
+    const investedWithPending = totalInvestment + pendingReloadsSum;
+
+    // Reloads já aprovados (separadamente para visualização)
+    const approvedReloadsAmount = Number(
+      planilhaData.summary?.approved_reload_amount || 0
+    );
+
+    return {
+      pnl,
+      totalBalance,
+      investedWithPending,
+      totalInvestment,
+      approvedReloadsAmount,
+    };
+  })();
+
   return (
     <div className="space-y-6">
       {/* Header da Planilha */}
@@ -326,85 +703,385 @@ const Planilha = ({
           <CardTitle>💰 Resumo Consolidado</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 border border-border rounded-lg">
-              <div className="text-sm text-muted-foreground">
-                Total Investido
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="text-center p-4 border border-border rounded-lg relative">
+              <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                💰 Total Investido
+                {/* 🚨 NOVO: Botão de edição para admin */}
+                {userRole === "admin" && (
+                  <Button
+                    size="sm"
+                    onClick={handleEditInvestment}
+                    className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 h-6"
+                    title="Editar investimento total"
+                  >
+                    ✏️
+                  </Button>
+                )}
               </div>
               <div className="text-2xl font-bold text-primary">
-                {formatCurrency(planilhaData.summary.total_initial_balance)}
+                {formatCurrency(derived.totalInvestment)}
               </div>
+
+              {/* 🚨 NOVO: Indicador se é manual ou automático */}
+              {planilhaData.summary?.is_manual_investment && (
+                <div className="text-xs text-blue-600 mt-1 font-medium">
+                  📝 Definido manualmente
+                </div>
+              )}
+
+              {/* 🚨 NOVO: Mostrar reloads separadamente na nova aba */}
+              {!planilhaData.summary?.is_manual_investment &&
+                derived.approvedReloadsAmount > 0 && (
+                  <div className="text-xs text-orange-600 mt-1 font-medium">
+                    + {formatCurrency(derived.approvedReloadsAmount)} reloads
+                  </div>
+                )}
+            </div>
+
+            {/* 🚨 NOVO: Card de Reload Manual (como Total Investido) */}
+            <div className="text-center p-4 border border-border rounded-lg relative">
+              <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                🔄 Reloads
+                {/* Botão de edição manual para admin */}
+                {userRole === "admin" && (
+                  <Button
+                    size="sm"
+                    onClick={handleEditReloads}
+                    className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 h-6"
+                    title="Editar reloads total"
+                  >
+                    ✏️
+                  </Button>
+                )}
+              </div>
+              <div className="text-2xl font-bold text-orange-600">
+                {formatCurrency(derived.approvedReloadsAmount || 0)}
+              </div>
+
+              {/* Indicador de que pode ser editado manualmente */}
+              {userRole === "admin" && (
+                <div className="text-xs text-orange-600 mt-1 font-medium">
+                  📝 Editável manualmente
+                </div>
+              )}
             </div>
             <div className="text-center p-4 border border-border rounded-lg">
-              <div className="text-sm text-muted-foreground">Saldo Atual</div>
+              <div className="text-sm text-muted-foreground">
+                📊 Saldo Atual
+              </div>
               <div className="text-2xl font-bold invictus-gold">
-                {formatCurrency(planilhaData.summary.total_current_balance)}
+                {formatCurrency(derived.totalBalance)}
               </div>
             </div>
             <div className="text-center p-4 border border-border rounded-lg">
-              <div className="text-sm text-muted-foreground">P&L Total</div>
+              <div className="text-sm text-muted-foreground">📈 P&L Total</div>
               <div
                 className={`text-2xl font-bold flex items-center justify-center space-x-1 ${
-                  planilhaData.summary.total_pnl >= 0
-                    ? "status-complete"
-                    : "status-critical"
+                  derived.pnl >= 0 ? "status-complete" : "status-critical"
                 }`}
               >
-                {planilhaData.summary.total_pnl >= 0 ? (
+                {derived.pnl >= 0 ? (
                   <TrendingUp className="w-5 h-5" />
                 ) : (
                   <TrendingDown className="w-5 h-5" />
                 )}
-                <span>{formatCurrency(planilhaData.summary.total_pnl)}</span>
+                <span>{formatCurrency(derived.pnl)}</span>
               </div>
             </div>
+
             <div className="text-center p-4 border border-border rounded-lg">
-              <div className="text-sm text-muted-foreground">Contas Ativas</div>
+              <div className="text-sm text-muted-foreground">🏦 Contas</div>
               <div className="text-2xl font-bold text-primary">
                 {planilhaData.summary.active_accounts} /{" "}
                 {planilhaData.summary.accounts_count}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Ativas / Total
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Pendências da Planilha */}
+      {/* 🚨 ALERTA DE RELOADS PENDENTES (SOMENTE PARA ADMIN/MANAGER) */}
+      {derived.approvedReloadsAmount > 0 &&
+        (userRole === "admin" || userRole === "manager") && (
+          <Alert className="border-orange-400/50 bg-orange-50/60 dark:bg-orange-950/20">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <AlertDescription className="text-orange-600 dark:text-orange-400">
+              <div className="font-semibold text-orange-700 dark:text-orange-300 mb-2">
+                ⚠️ Reload Pendente de Quitação
+              </div>
+              Você tem{" "}
+              <strong>{formatCurrency(derived.approvedReloadsAmount)}</strong>{" "}
+              em reload não quitado.
+              <br />
+              <strong>Deve quitar antes de solicitar saque.</strong>
+              <br />
+              <Button
+                size="sm"
+                className="mt-2 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-sm font-medium"
+                onClick={handlePaybackReloads}
+              >
+                🔄 Quitar Reload Agora
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+      {/* 🚨 NOVA: Aba Separada de Reloads Aprovados */}
+      {planilhaData.summary?.approved_reload_amount > 0 && (
+        <Card id="reloads-section" className="border-muted">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                🔄 <span className="text-primary">Reloads Aprovados</span>
+              </span>
+              {userRole === "admin" && (
+                <Button
+                  size="sm"
+                  onClick={handlePaybackReloads}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  💸 Quitar Reloads
+                </Button>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Reloads vinculados ao investimento total -{" "}
+              {userRole === "admin" ? "clique para quitar" : "aguardando admin"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-4 bg-gradient-to-b from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="text-sm text-green-700 dark:text-green-300 font-medium mb-2">
+                  💰 Total de Reloads
+                </div>
+                <div className="text-2xl font-bold text-green-800 dark:text-green-200">
+                  {formatCurrency(
+                    planilhaData.summary?.approved_reload_amount || 0
+                  )}
+                </div>
+              </div>
+
+              <div className="text-center p-4 bg-gradient-to-b from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="text-sm text-blue-700 dark:text-blue-300 font-medium mb-2">
+                  📊 Impacto no Investimento
+                </div>
+                <div className="text-lg font-bold text-blue-800 dark:text-blue-200">
+                  {planilhaData.summary?.is_manual_investment
+                    ? "📝 Manual"
+                    : `+${formatCurrency(
+                        planilhaData.summary?.approved_reload_amount || 0
+                      )}`}
+                </div>
+              </div>
+
+              <div className="text-center p-4 bg-gradient-to-b from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                <div className="text-sm text-amber-700 dark:text-amber-300 font-medium mb-2">
+                  ⚠️ Status
+                </div>
+                <div className="text-lg font-bold text-amber-800 dark:text-amber-200">
+                  {userRole === "admin"
+                    ? "⏳ Pendente quitação"
+                    : "⏱️ Aguardando admin"}
+                </div>
+              </div>
+            </div>
+
+            {userRole !== "admin" && (
+              <Alert className="mt-4 border-primary/20 bg-primary/5 dark:bg-primary/10">
+                <AlertTriangle className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-primary">
+                  <strong>ℹ️ Informação:</strong> Você não pode solicitar saques
+                  enquanto houver reloads não quitados. Aguarde o administrador
+                  processar a quitação.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pendências e Solicitações da Planilha */}
       {(planilhaData.pending_requests.reloads.length > 0 ||
         planilhaData.pending_requests.withdrawals.length > 0 ||
         planilhaData.accounts.some((acc) => acc.needs_update)) && (
-        <Card>
+        <Card id="solicitacoes-section">
           <CardHeader>
             <CardTitle className="status-pending">
-              ⚠️ Pendências da Planilha
+              ⚠️ Pendências e Solicitações
             </CardTitle>
+            <CardDescription>
+              Solicitações pendentes e dados que precisam de atenção
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Solicitações de Reload Detalhadas */}
               {planilhaData.pending_requests.reloads.length > 0 && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    📤 {planilhaData.pending_requests.reloads.length}{" "}
-                    solicitação(ões) de reload pendente(s)
-                  </AlertDescription>
-                </Alert>
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-amber-600 flex items-center gap-2">
+                    📤 Solicitações de Reload (
+                    {planilhaData.pending_requests.reloads.length})
+                  </h4>
+                  {planilhaData.pending_requests.reloads.map((reload) => (
+                    <div
+                      key={reload.id}
+                      className="border border-amber-200 rounded-lg p-4 bg-amber-50 dark:bg-amber-950 dark:border-amber-800"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 space-y-1">
+                          <div className="text-sm text-muted-foreground">
+                            Reload - {reload.platform_name}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Solicitado em{" "}
+                            {new Date(reload.created_at).toLocaleDateString(
+                              "pt-BR"
+                            )}
+                          </div>
+                          {reload.notes && (
+                            <div className="text-sm">
+                              <strong>Observações:</strong> {reload.notes}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium text-lg">
+                            {formatCurrency(reload.amount)}
+                          </div>
+                        </div>
+                      </div>
+                      {(userRole === "admin" || userRole === "manager") && (
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            className="bg-green-500 hover:bg-green-600 text-white border-green-400"
+                            onClick={() =>
+                              handleReloadAction(reload.id, "approve")
+                            }
+                          >
+                            ✅ Aprovar
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-red-500 hover:bg-red-600 text-white border-red-400"
+                            onClick={() =>
+                              handleReloadAction(reload.id, "reject")
+                            }
+                          >
+                            ❌ Rejeitar
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
+
+              {/* Solicitações de Saque Detalhadas */}
               {planilhaData.pending_requests.withdrawals.length > 0 && (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    📥 {planilhaData.pending_requests.withdrawals.length}{" "}
-                    solicitação(ões) de saque pendente(s)
-                  </AlertDescription>
-                </Alert>
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-blue-600 flex items-center gap-2">
+                    📥 Solicitações de Saque (
+                    {planilhaData.pending_requests.withdrawals.length})
+                  </h4>
+                  {planilhaData.pending_requests.withdrawals.map(
+                    (withdrawal) => (
+                      <div
+                        key={withdrawal.id}
+                        className="border border-blue-200 rounded-lg p-4 bg-blue-50 dark:bg-blue-950 dark:border-blue-800"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 space-y-1">
+                            <div className="text-sm text-muted-foreground">
+                              Saque - {withdrawal.platform_name}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Solicitado em{" "}
+                              {new Date(
+                                withdrawal.created_at
+                              ).toLocaleDateString("pt-BR")}
+                            </div>
+                            {withdrawal.notes && (
+                              <div className="text-sm">
+                                <strong>Observações:</strong> {withdrawal.notes}
+                              </div>
+                            )}
+                            <div className="text-sm">
+                              <strong>Status:</strong>{" "}
+                              <Badge variant="secondary">
+                                {withdrawal.status}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium text-lg">
+                              {formatCurrency(withdrawal.amount)}
+                            </div>
+                          </div>
+                        </div>
+                        {(userRole === "admin" || userRole === "manager") && (
+                          <div className="flex gap-2 mt-3">
+                            {withdrawal.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-500 hover:bg-green-600 text-white border-green-400"
+                                  onClick={() =>
+                                    handleWithdrawalAction(
+                                      withdrawal.id,
+                                      "approve"
+                                    )
+                                  }
+                                >
+                                  ✅ Aprovar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-red-500 hover:bg-red-600 text-white border-red-400"
+                                  onClick={() =>
+                                    handleWithdrawalAction(
+                                      withdrawal.id,
+                                      "reject"
+                                    )
+                                  }
+                                >
+                                  ❌ Rejeitar
+                                </Button>
+                              </>
+                            )}
+                            {withdrawal.status === "approved" && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-500 hover:bg-blue-600 text-white border-blue-400"
+                                onClick={() =>
+                                  handleWithdrawalAction(
+                                    withdrawal.id,
+                                    "complete"
+                                  )
+                                }
+                              >
+                                🏁 Marcar como Concluído
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  )}
+                </div>
               )}
+
+              {/* Alertas de Saldos Desatualizados */}
               {planilhaData.accounts.some((acc) => acc.needs_update) && (
                 <Alert>
                   <Clock className="h-4 w-4" />
                   <AlertDescription>
-                    📊 Alguns saldos precisam ser atualizados há mais de 24
-                    horas
+                    Alguns saldos precisam ser atualizados há mais de 24 horas
                   </AlertDescription>
                 </Alert>
               )}
@@ -445,11 +1122,7 @@ const Planilha = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(
-                  planilhaData.all_platform_accounts ||
-                  planilhaData.accounts ||
-                  []
-                ).map((account) => (
+                {sortedAccounts.map((account) => (
                   <TableRow key={account.id || account.platform_id}>
                     <TableCell className="font-medium">
                       {account.platform_name}
@@ -683,6 +1356,21 @@ const Planilha = ({
         </CardContent>
       </Card>
 
+      {/* Evolução do Bankroll (30 dias) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg gradient-gold-text">
+            📈 Evolução do Bankroll (30 dias)
+          </CardTitle>
+          <CardDescription>
+            Histórico de evolução do bankroll nas últimas 4 semanas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BankrollChart playerId={userId} />
+        </CardContent>
+      </Card>
+
       {/* Solicitações Pendentes */}
       {(planilhaData.pending_requests.reloads.length > 0 ||
         planilhaData.pending_requests.withdrawals.length > 0) && (
@@ -738,22 +1426,51 @@ const Planilha = ({
       {userRole === "player" && (
         <Card>
           <CardHeader>
-            <CardTitle>⚡ Ações Rápidas</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-full bg-primary/10">⚡</div>
+              <span>Ações Rápidas</span>
+            </CardTitle>
+            <CardDescription>
+              Acesse rapidamente as funcionalidades mais usadas
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={onRequestReload} className="gradient-gold">
-                <Upload className="w-4 h-4 mr-2" />
-                Solicitar Reload
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Button
+                onClick={onRequestReload}
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-3 border-2 border-muted hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-950/20 transition-all duration-200 group"
+              >
+                <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
+                  <Upload className="w-5 h-5 text-green-700 dark:text-green-400" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:text-green-700 dark:group-hover:text-green-300">
+                  Solicitar Reload
+                </span>
               </Button>
-              <Button onClick={onRequestWithdrawal} variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Solicitar Saque
+              <Button
+                onClick={onRequestWithdrawal}
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-3 border-2 border-muted hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-all duration-200 group"
+              >
+                <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
+                  <Download className="w-5 h-5 text-blue-700 dark:text-blue-400" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:text-blue-700 dark:group-hover:text-blue-300">
+                  Solicitar Saque
+                </span>
               </Button>
-
-              <Button variant="outline" onClick={fetchPlanilhaData}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Atualizar
+              <Button
+                onClick={fetchPlanilhaData}
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center space-y-3 border-2 border-muted hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-all duration-200 group"
+              >
+                <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30 group-hover:bg-amber-200 dark:group-hover:bg-amber-800/40 transition-colors">
+                  <RefreshCw className="w-5 h-5 text-amber-700 dark:text-amber-400" />
+                </div>
+                <span className="text-sm font-semibold text-foreground group-hover:text-amber-700 dark:group-hover:text-amber-300">
+                  Atualizar
+                </span>
               </Button>
             </div>
           </CardContent>
@@ -793,8 +1510,34 @@ const Planilha = ({
         </Card>
       )}
 
-      {/* Calendário de Preenchimento (últimos 30 dias) */}
-      <CalendarTracker playerId={userId} />
+      {/* Calendário de Preenchimento (últimos 30 dias) - Popover */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg gradient-gold-text flex items-center gap-2">
+            📅 Calendário de Preenchimento
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCalendar(!showCalendar)}
+            >
+              <Calendar className="w-4 h-4 mr-1" />
+              {showCalendar ? "Ocultar" : "Ver Calendário"}
+            </Button>
+          </CardTitle>
+          <CardDescription>
+            Rastreamento de preenchimento de dados nos últimos 30 dias
+          </CardDescription>
+        </CardHeader>
+        {showCalendar && (
+          <CardContent>
+            <CalendarTracker playerId={userId} />
+          </CardContent>
+        )}
+      </Card>
+
+      {/* 🚨 REMOVIDO: Sistema de templates - agora aprovação é direta */}
+
+      {/* 🚨 REMOVIDO: Modais desnecessários - agora tudo é direto com confirm() */}
     </div>
   );
 };

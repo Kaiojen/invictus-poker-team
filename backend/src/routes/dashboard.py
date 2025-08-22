@@ -18,25 +18,47 @@ def get_manager_dashboard():
         
         # Estatísticas gerais
         total_players = User.query.filter_by(role=UserRole.PLAYER, is_active=True).count()
-        pending_requests = ReloadRequest.query.filter_by(status=ReloadStatus.PENDING).count()
         
-        # Jogadores com pendências
-        players_with_pending_data = []
+        # Contar TODAS as solicitações pendentes (reload + withdrawal)
+        pending_reload_requests = ReloadRequest.query.filter_by(status=ReloadStatus.PENDING).count()
+        
+        from src.models.models import WithdrawalRequest, WithdrawalStatus
+        pending_withdrawal_requests = WithdrawalRequest.query.filter_by(status=WithdrawalStatus.PENDING).count()
+        
+        pending_requests = pending_reload_requests + pending_withdrawal_requests
+        
+        # Jogadores com pendências - OTIMIZADO com joins
         players = User.query.filter_by(role=UserRole.PLAYER, is_active=True).all()
+        player_ids = [p.id for p in players]
         
+        # Buscar dados incompletos de todos os players em uma query
+        incomplete_data_counts = db.session.query(
+            PlayerData.user_id,
+            func.count(PlayerData.id).label('count')
+        ).filter(
+            PlayerData.user_id.in_(player_ids),
+            PlayerData.is_required == True,
+            PlayerData.is_complete == False
+        ).group_by(PlayerData.user_id).all()
+        
+        incomplete_by_user = {row.user_id: row.count for row in incomplete_data_counts}
+        
+        # Buscar reload requests pendentes de todos os players em uma query
+        pending_reload_counts = db.session.query(
+            ReloadRequest.user_id,
+            func.count(ReloadRequest.id).label('count')
+        ).filter(
+            ReloadRequest.user_id.in_(player_ids),
+            ReloadRequest.status == ReloadStatus.PENDING
+        ).group_by(ReloadRequest.user_id).all()
+        
+        pending_by_user = {row.user_id: row.count for row in pending_reload_counts}
+        
+        # Construir lista de players
+        players_with_pending_data = []
         for player in players:
-            # Verificar dados incompletos
-            incomplete_data = PlayerData.query.filter_by(
-                user_id=player.id,
-                is_required=True,
-                is_complete=False
-            ).count()
-            
-            # Verificar solicitações pendentes
-            pending_reload_requests = ReloadRequest.query.filter_by(
-                user_id=player.id,
-                status=ReloadStatus.PENDING
-            ).count()
+            incomplete_data = incomplete_by_user.get(player.id, 0)
+            pending_reload_requests = pending_by_user.get(player.id, 0)
             
             status = 'complete'
             if incomplete_data > 0:
@@ -62,8 +84,9 @@ def get_manager_dashboard():
         recent_transactions = Transaction.query\
             .order_by(Transaction.created_at.desc()).limit(10).all()
         
-        # Resumo financeiro (últimos 30 dias) – usar mesma fonte do gráfico (BalanceHistory)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        # Resumo financeiro (últimos 30 dias) – alinhado com gráfico
+        end_date = datetime.utcnow().replace(hour=23, minute=59, second=59, microsecond=999999)
+        thirty_days_ago = end_date - timedelta(days=29)  # 30 dias incluindo hoje
 
         financial_summary = {
             'total_reloads': 0,
@@ -97,6 +120,7 @@ def get_manager_dashboard():
             func.sum(BalanceHistory.new_balance - BalanceHistory.old_balance)
         ).filter(
             BalanceHistory.created_at >= thirty_days_ago,
+            BalanceHistory.created_at <= end_date,
             BalanceHistory.change_reason == 'close_day'
         ).scalar() or 0.0
         financial_summary['monthly_profit_chart_aligned'] = float(rows)
@@ -105,6 +129,8 @@ def get_manager_dashboard():
             'statistics': {
                 'total_players': total_players,
                 'pending_requests': pending_requests,
+                'pending_reload_requests': pending_reload_requests,
+                'pending_withdrawal_requests': pending_withdrawal_requests,
                 'players_with_issues': len([p for p in players_with_pending_data if p['status'] != 'complete'])
             },
             'players': players_with_pending_data,
@@ -326,44 +352,83 @@ def get_team_financials():
         
         # Buscar todos os jogadores
         players = User.query.filter_by(role=UserRole.PLAYER, is_active=True).all()
+        player_ids = [p.id for p in players]
         
-        # Estatísticas gerais do time
-        total_balance = 0
-        monthly_profit = 0
-        pending_reloads = 0
-        active_players = 0
+        # Período (últimos 30 dias) - alinhado com o gráfico
+        end_date = datetime.utcnow().replace(hour=23, minute=59, second=59, microsecond=999999)
+        thirty_days_ago = end_date - timedelta(days=29)  # 30 dias incluindo hoje
         
-        # Período (últimos 30 dias)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        # OTIMIZAR: Buscar todos os dados necessários em queries agrupadas
         
+        # 1. Contas agrupadas por usuário
+        accounts_by_user = db.session.query(
+            Account.user_id,
+            func.sum(Account.current_balance).label('total_balance'),
+            func.count(Account.id).label('account_count')
+        ).filter(
+            Account.user_id.in_(player_ids),
+            Account.is_active == True
+        ).group_by(Account.user_id).all()
+        
+        balance_by_user = {row.user_id: {'balance': float(row.total_balance), 'count': row.account_count} for row in accounts_by_user}
+        
+        # 2. Dados incompletos agrupados por usuário
+        incomplete_data_counts = db.session.query(
+            PlayerData.user_id,
+            func.count(PlayerData.id).label('count')
+        ).filter(
+            PlayerData.user_id.in_(player_ids),
+            PlayerData.is_required == True,
+            PlayerData.is_complete == False
+        ).group_by(PlayerData.user_id).all()
+        
+        incomplete_by_user = {row.user_id: row.count for row in incomplete_data_counts}
+        
+        # 3. Reload requests pendentes agrupados por usuário
+        pending_reload_counts = db.session.query(
+            ReloadRequest.user_id,
+            func.count(ReloadRequest.id).label('count')
+        ).filter(
+            ReloadRequest.user_id.in_(player_ids),
+            ReloadRequest.status == ReloadStatus.PENDING
+        ).group_by(ReloadRequest.user_id).all()
+        
+        pending_by_user = {row.user_id: row.count for row in pending_reload_counts}
+        
+        # 4. Transações mensais agrupadas por usuário
+        monthly_transactions = db.session.query(
+            Transaction.user_id,
+            Transaction.transaction_type,
+            func.sum(Transaction.amount).label('total_amount')
+        ).filter(
+            Transaction.user_id.in_(player_ids),
+            Transaction.created_at >= thirty_days_ago,
+            Transaction.transaction_type.in_([TransactionType.PROFIT, TransactionType.LOSS])
+        ).group_by(Transaction.user_id, Transaction.transaction_type).all()
+        
+        profit_by_user = {}
+        for row in monthly_transactions:
+            if row.user_id not in profit_by_user:
+                profit_by_user[row.user_id] = 0
+            amount = float(row.total_amount)
+            if row.transaction_type == TransactionType.PROFIT:
+                profit_by_user[row.user_id] += amount
+            elif row.transaction_type == TransactionType.LOSS:
+                profit_by_user[row.user_id] -= amount
+        
+        # Calcular estatísticas
+        total_balance = sum(data['balance'] for data in balance_by_user.values())
+        pending_reloads = sum(pending_by_user.values())
+        active_players = len(balance_by_user)
+        monthly_profit = sum(profit_by_user.values())
+        
+        # Construir dados dos players
         players_data = []
-        
         for player in players:
-            # Contas do jogador
-            accounts = Account.query.filter_by(user_id=player.id, is_active=True).all()
-            
-            # Somar saldos
-            player_balance = sum(float(account.current_balance) for account in accounts)
-            total_balance += player_balance
-            
-            # Verificar se tem conta ativa
-            if accounts:
-                active_players += 1
-            
-            # Verificar dados incompletos
-            incomplete_data = PlayerData.query.filter_by(
-                user_id=player.id,
-                is_required=True,
-                is_complete=False
-            ).count()
-            
-            # Verificar solicitações pendentes
-            pending_reload_requests = ReloadRequest.query.filter_by(
-                user_id=player.id,
-                status=ReloadStatus.PENDING
-            ).count()
-            
-            pending_reloads += pending_reload_requests
+            balance_data = balance_by_user.get(player.id, {'balance': 0, 'count': 0})
+            incomplete_data = incomplete_by_user.get(player.id, 0)
+            pending_reload_requests = pending_by_user.get(player.id, 0)
+            player_monthly_profit = profit_by_user.get(player.id, 0)
             
             # Determinar status do jogador
             status = 'complete'
@@ -372,29 +437,13 @@ def get_team_financials():
             if pending_reload_requests > 0:
                 status = 'critical'
             
-            # Lucro mensal do jogador
-            player_transactions = Transaction.query.filter(
-                Transaction.user_id == player.id,
-                Transaction.created_at >= thirty_days_ago
-            ).all()
-            
-            player_monthly_profit = 0
-            for transaction in player_transactions:
-                amount = float(transaction.amount)
-                if transaction.transaction_type == TransactionType.PROFIT:
-                    player_monthly_profit += amount
-                elif transaction.transaction_type == TransactionType.LOSS:
-                    player_monthly_profit -= amount
-            
-            monthly_profit += player_monthly_profit
-            
             players_data.append({
                 'id': player.id,
                 'full_name': player.full_name,
                 'username': player.username,
                 'status': status,
-                'totalBalance': player_balance,
-                'accountCount': len(accounts),
+                'totalBalance': balance_data['balance'],
+                'accountCount': balance_data['count'],
                 'pendingCount': incomplete_data + pending_reload_requests,
                 'monthlyProfit': player_monthly_profit,
                 'last_activity': player.updated_at.isoformat() if player.updated_at else None
@@ -412,6 +461,7 @@ def get_team_financials():
             func.sum(BalanceHistory.new_balance - BalanceHistory.old_balance)
         ).filter(
             BalanceHistory.created_at >= thirty_days_ago,
+            BalanceHistory.created_at <= end_date,
             BalanceHistory.change_reason == 'close_day'
         ).scalar() or 0.0
         monthly_profit = float(monthly_profit_aligned)
@@ -436,7 +486,7 @@ def get_team_financials():
 @dashboard_bp.route('/team-pnl-series', methods=['GET'])
 @login_required
 def get_team_pnl_series():
-    """Série diária de P&L do time baseada em BalanceHistory (close_day)."""
+    """Série diária de P&L do time baseada em TODAS as mudanças de BalanceHistory."""
     try:
         current_user = User.query.get(session['user_id'])
         if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
@@ -446,13 +496,15 @@ def get_team_pnl_series():
         end_date = datetime.utcnow().replace(hour=23, minute=59, second=59, microsecond=999999)
         start_date = end_date - timedelta(days=days - 1)
 
+        # ✅ CORRIGIDO: Buscar TODAS as mudanças de saldo, não só 'close_day'
+        # Isso incluirá todas as atualizações de planilha em tempo real
         rows = db.session.query(
             func.date(BalanceHistory.created_at).label('d'),
             func.sum(BalanceHistory.new_balance - BalanceHistory.old_balance).label('delta')
         ).filter(
             BalanceHistory.created_at >= start_date,
-            BalanceHistory.created_at <= end_date,
-            BalanceHistory.change_reason == 'close_day'
+            BalanceHistory.created_at <= end_date
+            # ❌ Removido: BalanceHistory.change_reason == 'close_day'
         ).group_by(func.date(BalanceHistory.created_at)).all()
 
         delta_by_day = {str(r.d): float(r.delta or 0.0) for r in rows}
@@ -460,6 +512,16 @@ def get_team_pnl_series():
         series = []
         cursor = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
         cumulative = 0.0
+        
+        # Calcular saldo inicial (antes do período)
+        initial_balance = db.session.query(
+            func.sum(BalanceHistory.new_balance - BalanceHistory.old_balance)
+        ).filter(
+            BalanceHistory.created_at < start_date
+        ).scalar() or 0.0
+        
+        cumulative = float(initial_balance)
+        
         while cursor <= end_date:
             key = cursor.date().isoformat()
             delta = delta_by_day.get(key, 0.0)

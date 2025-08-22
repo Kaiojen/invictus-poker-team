@@ -1,0 +1,45 @@
+/* 🎨 CORES SUAVIZADAS PARA SEÇÕES DE PENDÊNCIAS */
+
+/* Cards de reloads com cores mais suaves */
+.reload-card-soft {
+  background-color: rgba(251, 146, 60, 0.1) !important;
+  border-color: rgba(251, 146, 60, 0.3) !important;
+  color: rgba(251, 146, 60, 0.9) !important;
+}
+
+/* Alertas com cores suavizadas */
+.alert-soft-orange {
+  background-color: rgba(254, 215, 170, 0.2) !important;
+  border-color: rgba(251, 146, 60, 0.4) !important;
+}
+
+/* Botões de ação com cores suaves */
+.btn-approve-soft {
+  background-color: #22c55e !important;
+  border-color: #16a34a !important;
+  color: white !important;
+}
+
+.btn-approve-soft:hover {
+  background-color: #16a34a !important;
+}
+
+.btn-reject-soft {
+  background-color: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: white !important;
+}
+
+.btn-reject-soft:hover {
+  background-color: #dc2626 !important;
+}
+
+.btn-complete-soft {
+  background-color: #3b82f6 !important;
+  border-color: #2563eb !important;
+  color: white !important;
+}
+
+.btn-complete-soft:hover {
+  background-color: #2563eb !important;
+}

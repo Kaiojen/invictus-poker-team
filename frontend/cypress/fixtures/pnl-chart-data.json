@@ -1,0 +1,46 @@
+{
+  "chart_data": [
+    {
+      "month": "2024-09",
+      "pnl": 1654.32,
+      "revenue": 1850.0,
+      "expenses": 195.68
+    },
+    {
+      "month": "2024-10",
+      "pnl": 2123.45,
+      "revenue": 2400.0,
+      "expenses": 276.55
+    },
+    {
+      "month": "2024-11",
+      "pnl": 1876.9,
+      "revenue": 2100.0,
+      "expenses": 223.1
+    },
+    {
+      "month": "2024-12",
+      "pnl": 3245.67,
+      "revenue": 3600.0,
+      "expenses": 354.33
+    },
+    {
+      "month": "2025-01",
+      "pnl": 2890.15,
+      "revenue": 3200.0,
+      "expenses": 309.85
+    }
+  ],
+  "totals": {
+    "total_pnl": 11790.49,
+    "total_revenue": 13150.0,
+    "total_expenses": 1359.51,
+    "average_monthly_pnl": 2358.1
+  },
+  "trends": {
+    "pnl_trend": "positive",
+    "growth_rate": 12.5,
+    "best_month": "2024-12",
+    "worst_month": "2024-09"
+  }
+}

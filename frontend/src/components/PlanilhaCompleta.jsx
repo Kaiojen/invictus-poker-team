@@ -228,19 +228,7 @@ const PlanilhaCompleta = ({ userId, userRole }) => {
           </Card>
         ))}
 
-      {/* Admin: Link para gerenciamento */}
-      {userRole === "admin" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Gerenciar Campos</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center text-muted-foreground">
-              ⚙️ Configuração de campos será implementada em breve
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Removido: "Gerenciar Campos" - substituído pelo gráfico de evolução mensal já implementado na planilha principal */}
     </div>
   );
 };

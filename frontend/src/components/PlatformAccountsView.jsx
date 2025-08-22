@@ -106,52 +106,93 @@ const PlatformAccountsView = ({ playerId }) => {
             platform.total_balance - platform.total_initial;
 
           return (
-            <Card key={platform.platform_id} className="border">
-              <CardHeader className="pb-3">
+            <Card
+              key={platform.platform_id}
+              className="border border-gray-600 bg-gradient-to-br from-gray-800 to-gray-900 shadow-xl"
+            >
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
-                    {platform.platform_name}
+                  <CardTitle className="text-xl font-bold flex items-center gap-2">
+                    {platform.platform_name === "PokerStars" && "♠️"}
+                    {platform.platform_name === "GGPoker" && "♦️"}
+                    {platform.platform_name === "PartyPoker" && "♣️"}
+                    {platform.platform_name === "888poker" && "♥️"}
+                    {platform.platform_name === "LuxonPay" && "💳"}
+                    <span className="gradient-gold-text">
+                      {platform.platform_name}
+                    </span>
                   </CardTitle>
                   {getStatusIcon(totalProfitLoss)}
                 </div>
-                <CardDescription>
+                <CardDescription className="text-gray-400 font-medium">
                   {platform.accounts.length} conta(s) ativa(s)
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Saldo Total:</span>
-                  <span className="font-medium">
-                    {formatCurrency(platform.total_balance)}
-                  </span>
+              <CardContent className="space-y-3">
+                <div className="bg-gradient-to-r from-blue-900/30 to-blue-800/30 p-4 rounded-lg border border-blue-500/30">
+                  <div className="text-center">
+                    <p className="text-sm text-blue-300 font-medium mb-1">
+                      💰 Saldo Total
+                    </p>
+                    <p className="text-xl font-bold text-blue-400">
+                      {formatCurrency(platform.total_balance)}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Investimento:</span>
-                  <span className="font-medium">
-                    {formatCurrency(platform.total_initial)}
-                  </span>
+
+                <div className="bg-gradient-to-r from-purple-900/30 to-purple-800/30 p-4 rounded-lg border border-purple-500/30">
+                  <div className="text-center">
+                    <p className="text-sm text-purple-300 font-medium mb-1">
+                      💎 Investimento
+                    </p>
+                    <p className="text-xl font-bold text-purple-400">
+                      {formatCurrency(platform.total_initial)}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>P&L:</span>
-                  <span
-                    className={`font-medium ${getStatusColor(totalProfitLoss)}`}
+
+                <div
+                  className={`p-4 rounded-lg border text-center ${
+                    totalProfitLoss >= 0
+                      ? "bg-gradient-to-r from-green-900/30 to-green-800/30 border-green-500/30"
+                      : "bg-gradient-to-r from-red-900/30 to-red-800/30 border-red-500/30"
+                  }`}
+                >
+                  <p
+                    className={`text-sm font-medium mb-1 ${
+                      totalProfitLoss >= 0 ? "text-green-300" : "text-red-300"
+                    }`}
+                  >
+                    📈 P&L
+                  </p>
+                  <p
+                    className={`text-xl font-bold ${getStatusColor(
+                      totalProfitLoss
+                    )}`}
                   >
                     {totalProfitLoss > 0 ? "+" : ""}
                     {formatCurrency(totalProfitLoss)}
-                  </span>
+                  </p>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>ROI:</span>
-                  <span
-                    className={`font-medium ${getStatusColor(totalProfitLoss)}`}
-                  >
-                    {platform.total_initial > 0
-                      ? `${(
-                          (totalProfitLoss / platform.total_initial) *
-                          100
-                        ).toFixed(1)}%`
-                      : "0%"}
-                  </span>
+
+                <div className="bg-gradient-to-r from-yellow-900/30 to-yellow-800/30 p-4 rounded-lg border border-yellow-500/30">
+                  <div className="text-center">
+                    <p className="text-sm text-yellow-300 font-medium mb-1">
+                      📊 ROI
+                    </p>
+                    <p
+                      className={`text-xl font-bold ${getStatusColor(
+                        totalProfitLoss
+                      )}`}
+                    >
+                      {platform.total_initial > 0
+                        ? `${(
+                            (totalProfitLoss / platform.total_initial) *
+                            100
+                          ).toFixed(1)}%`
+                        : "0%"}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

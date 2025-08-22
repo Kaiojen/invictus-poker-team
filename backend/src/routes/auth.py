@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, session
 from src.models.models import db, User, UserRole
 from functools import wraps
+from src.middleware.rate_limiter import login_rate_limit, sensitive_rate_limit, rate_limiter
+from src.middleware.csrf_protection import get_csrf_token
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
 import os
 import base64
@@ -37,6 +40,7 @@ def admin_required(f):
     return decorated_function
 
 @auth_bp.route('/login', methods=['POST'])
+@login_rate_limit
 def login():
     try:
         data = request.get_json()
@@ -48,6 +52,7 @@ def login():
             return jsonify({'error': 'Username and password are required'}), 400
         
         user = User.query.filter_by(username=username).first()
+        ip = get_remote_address()
         
         if user and user.check_password(password) and user.is_active:
             # Verificação 2FA (se habilitado)
@@ -77,11 +82,16 @@ def login():
             session['user_id'] = user.id
             session['user_role'] = user.role.value
             
+            # Limpar tentativas falhadas após sucesso
+            rate_limiter.clear_failed_attempts(ip)
+            
             return jsonify({
                 'message': 'Login successful',
                 'user': user.to_dict()
             }), 200
         else:
+            # Registrar tentativa falhada
+            rate_limiter.record_failed_attempt(ip)
             return jsonify({'error': 'Invalid credentials'}), 401
             
     except Exception as e:
@@ -104,12 +114,25 @@ def get_current_user():
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
-        return jsonify({'user': user.to_dict()}), 200
+        return jsonify({
+            'user': user.to_dict(),
+            'csrf_token': get_csrf_token()
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@auth_bp.route('/csrf-token', methods=['GET'])
+@login_required
+def get_csrf_token_endpoint():
+    """Endpoint dedicado para obter token CSRF"""
+    try:
+        return jsonify({'csrf_token': get_csrf_token()}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/change-password', methods=['POST'])
 @login_required
+@sensitive_rate_limit
 def change_password():
     try:
         data = request.get_json()
@@ -137,6 +160,7 @@ def change_password():
 # ====== Forgot password flow ======
 
 @auth_bp.route('/forgot-password', methods=['POST'])
+@sensitive_rate_limit
 def forgot_password():
     try:
         data = request.get_json()
@@ -201,6 +225,7 @@ def forgot_password():
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/reset-password', methods=['POST'])
+@sensitive_rate_limit
 def reset_password():
     try:
         data = request.get_json()

@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "amount": 400.0,
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "status": "pending",
+    "player_notes": "Saque de lucros da semana",
+    "manager_notes": null,
+    "created_at": "2025-01-16T11:45:00Z",
+    "updated_at": "2025-01-16T11:45:00Z"
+  },
+  {
+    "id": 2,
+    "amount": 150.0,
+    "platform": {
+      "name": "gg",
+      "display_name": "GGPoker"
+    },
+    "status": "approved",
+    "player_notes": "Saque parcial",
+    "manager_notes": "Aprovado rapidamente",
+    "created_at": "2025-01-15T13:20:00Z",
+    "updated_at": "2025-01-15T14:00:00Z"
+  },
+  {
+    "id": 3,
+    "amount": 300.0,
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "status": "rejected",
+    "player_notes": "Urgente para despesas",
+    "manager_notes": "Saldo insuficiente na conta",
+    "created_at": "2025-01-14T18:10:00Z",
+    "updated_at": "2025-01-14T19:30:00Z"
+  }
+]

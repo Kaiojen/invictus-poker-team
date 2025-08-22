@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "amount": 400.0,
+    "user": {
+      "username": "player1",
+      "full_name": "João Silva"
+    },
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "account": {
+      "current_balance": 1200.0
+    },
+    "status": "pending",
+    "player_notes": "Saque de lucros da semana",
+    "manager_notes": null,
+    "created_at": "2025-01-16T11:45:00Z",
+    "updated_at": "2025-01-16T11:45:00Z"
+  },
+  {
+    "id": 2,
+    "amount": 250.0,
+    "user": {
+      "username": "player3",
+      "full_name": "Carlos Oliveira"
+    },
+    "platform": {
+      "name": "gg",
+      "display_name": "GGPoker"
+    },
+    "account": {
+      "current_balance": 800.0
+    },
+    "status": "approved",
+    "player_notes": "Saque parcial",
+    "manager_notes": "Aprovado - saldo suficiente",
+    "created_at": "2025-01-15T16:30:00Z",
+    "updated_at": "2025-01-15T17:20:00Z"
+  }
+]

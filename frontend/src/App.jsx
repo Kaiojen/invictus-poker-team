@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import LoginForm from './components/LoginForm';
-import Dashboard from './components/Dashboard';
-import './App.css';
+import { useState, useEffect } from "react";
+import LoginForm from "./components/LoginForm";
+import Dashboard from "./components/Dashboard";
+import "./App.css";
+import "./styles/soft-colors.css";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -13,8 +14,8 @@ function App() {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include'
+      const response = await fetch("/api/auth/me", {
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -22,7 +23,7 @@ function App() {
         setUser(data.user);
       }
     } catch (err) {
-      console.error('Erro ao verificar autenticação:', err);
+      console.error("Erro ao verificar autenticação:", err);
     } finally {
       setLoading(false);
     }

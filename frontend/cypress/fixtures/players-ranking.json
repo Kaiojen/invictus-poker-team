@@ -1,0 +1,46 @@
+[
+  {
+    "rank": 1,
+    "username": "player1",
+    "full_name": "João Silva",
+    "total_pnl": 4567.89,
+    "monthly_pnl": 890.45,
+    "total_reloads": 15,
+    "total_withdrawals": 8,
+    "win_rate": 68.5,
+    "active": true
+  },
+  {
+    "rank": 2,
+    "username": "player2",
+    "full_name": "Maria Santos",
+    "total_pnl": 3245.67,
+    "monthly_pnl": 654.32,
+    "total_reloads": 12,
+    "total_withdrawals": 6,
+    "win_rate": 64.2,
+    "active": true
+  },
+  {
+    "rank": 3,
+    "username": "player3",
+    "full_name": "Carlos Oliveira",
+    "total_pnl": 2123.45,
+    "monthly_pnl": 423.78,
+    "total_reloads": 18,
+    "total_withdrawals": 10,
+    "win_rate": 59.8,
+    "active": true
+  },
+  {
+    "rank": 4,
+    "username": "player4",
+    "full_name": "Ana Costa",
+    "total_pnl": 1876.23,
+    "monthly_pnl": 312.45,
+    "total_reloads": 9,
+    "total_withdrawals": 4,
+    "win_rate": 72.1,
+    "active": false
+  }
+]

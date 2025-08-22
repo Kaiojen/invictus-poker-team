@@ -10,12 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+
 import {
   CheckCircle,
   AlertTriangle,
@@ -100,6 +95,37 @@ const PlayerDashboardEnhanced = ({
       },
     ];
     setTips(playerTips);
+  };
+
+  // ✅ FUNÇÕES DAS AÇÕES RÁPIDAS
+  const handleRequestReload = () => {
+    if (onRequestReload) {
+      onRequestReload();
+    } else {
+      toast.info("Função de reload será implementada em breve");
+    }
+  };
+
+  const handleRequestWithdrawal = () => {
+    if (onRequestWithdrawal) {
+      onRequestWithdrawal();
+    } else {
+      toast.info("Função de saque será implementada em breve");
+    }
+  };
+
+  const handleUpdateBalances = () => {
+    toast.info("Atualizando página...");
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  };
+
+  const handleHelp = () => {
+    toast.info("Abrindo página de ajuda...");
+    setTimeout(() => {
+      window.open("/help", "_blank");
+    }, 500);
   };
 
   const calculateCompletionPercentage = () => {
@@ -206,6 +232,16 @@ const PlayerDashboardEnhanced = ({
 
   return (
     <div className="container mx-auto px-4 py-6 space-y-6">
+      {/* Título do Invictus Poker Team */}
+      <div className="text-center py-4">
+        <h2 className="text-3xl sm:text-4xl font-extrabold gradient-gold-text">
+          Invictus Poker Team
+        </h2>
+        <p className="text-sm sm:text-base text-muted-foreground mt-1">
+          Mente fria, jogo afiado. A vitória é só o começo.
+        </p>
+      </div>
+
       {/* Header com Status Geral */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
         <div>
@@ -217,36 +253,8 @@ const PlayerDashboardEnhanced = ({
             Bem-vindo, {user.full_name}! Aqui está o resumo da sua situação.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          {getStatusBadge(playerStatus)}
-          <Button variant="outline" size="sm" onClick={fetchDashboardData}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-        </div>
+        <div className="flex items-center space-x-3"></div>
       </div>
-
-      {/* Progresso de Completude */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Progresso do Perfil</CardTitle>
-            <span className="text-2xl font-bold invictus-gold">
-              {completionPercentage}%
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Progress value={completionPercentage} className="h-3 mb-3" />
-          <p className="text-sm text-muted-foreground">
-            {completionPercentage === 100
-              ? "🎉 Parabéns! Seu perfil está 100% completo!"
-              : `${
-                  100 - completionPercentage
-                }% restante para completar seu perfil`}
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Próximas Ações */}
       {nextActions.length > 0 && (
@@ -372,34 +380,26 @@ const PlayerDashboardEnhanced = ({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tips.map((tip, index) => (
-              <TooltipProvider key={index}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-secondary/50 transition-colors cursor-help">
-                      <tip.icon
-                        className={`w-5 h-5 mt-0.5 ${
-                          tip.type === "warning"
-                            ? "text-yellow-500"
-                            : tip.type === "success"
-                            ? "text-green-500"
-                            : "text-blue-500"
-                        }`}
-                      />
-                      <div>
-                        <p className="font-medium text-sm">{tip.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {tip.description}
-                        </p>
-                      </div>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs">
-                      Clique para mais informações sobre esta dica
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <div
+                key={index}
+                className="flex items-start space-x-3 p-3 rounded-lg border"
+              >
+                <tip.icon
+                  className={`w-5 h-5 mt-0.5 ${
+                    tip.type === "warning"
+                      ? "text-yellow-500"
+                      : tip.type === "success"
+                      ? "text-green-500"
+                      : "text-blue-500"
+                  }`}
+                />
+                <div>
+                  <p className="font-medium text-sm">{tip.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {tip.description}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
         </CardContent>
@@ -408,41 +408,60 @@ const PlayerDashboardEnhanced = ({
       {/* Ações Rápidas */}
       <Card>
         <CardHeader>
-          <CardTitle>Ações Rápidas</CardTitle>
+          <CardTitle>🚀 Ações Rápidas</CardTitle>
           <CardDescription>
             Acesse rapidamente as funcionalidades mais usadas
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Button
-              onClick={() => onRequestReload && onRequestReload()}
-              className="h-auto p-4 flex flex-col space-y-2"
+              onClick={handleRequestReload}
+              variant="outline"
+              className="h-auto p-6 flex flex-col items-center space-y-3 border-2 border-muted hover:border-primary hover:bg-primary/5 transition-all duration-200 group"
             >
-              <DollarSign className="w-5 h-5" />
-              <span className="text-xs">Solicitar Reload</span>
+              <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30 group-hover:bg-green-200 dark:group-hover:bg-green-800/40 transition-colors">
+                <DollarSign className="w-6 h-6 text-green-700 dark:text-green-400" />
+              </div>
+              <span className="text-sm font-semibold text-foreground group-hover:text-primary">
+                Solicitar Reload
+              </span>
             </Button>
             <Button
-              onClick={() => onRequestWithdrawal && onRequestWithdrawal()}
+              onClick={handleRequestWithdrawal}
               variant="outline"
-              className="h-auto p-4 flex flex-col space-y-2"
+              className="h-auto p-6 flex flex-col items-center space-y-3 border-2 border-muted hover:border-primary hover:bg-primary/5 transition-all duration-200 group"
             >
-              <TrendingDown className="w-5 h-5" />
-              <span className="text-xs">Solicitar Saque</span>
+              <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30 group-hover:bg-blue-200 dark:group-hover:bg-blue-800/40 transition-colors">
+                <TrendingDown className="w-6 h-6 text-blue-700 dark:text-blue-400" />
+              </div>
+              <span className="text-sm font-semibold text-foreground group-hover:text-primary">
+                Solicitar Saque
+              </span>
             </Button>
             <Button
+              onClick={handleUpdateBalances}
               variant="outline"
-              className="h-auto p-4 flex flex-col space-y-2"
+              className="h-auto p-6 flex flex-col items-center space-y-3 border-2 border-muted hover:border-primary hover:bg-primary/5 transition-all duration-200 group"
             >
-              <RefreshCw className="w-5 h-5" />
-              <span className="text-xs">Atualizar Saldos</span>
+              <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900/30 group-hover:bg-amber-200 dark:group-hover:bg-amber-800/40 transition-colors">
+                <RefreshCw className="w-6 h-6 text-amber-700 dark:text-amber-400" />
+              </div>
+              <span className="text-sm font-semibold text-foreground group-hover:text-primary">
+                Atualizar Saldos
+              </span>
             </Button>
             <Button
+              onClick={handleHelp}
               variant="outline"
-              className="h-auto p-4 flex flex-col space-y-2"
+              className="h-auto p-6 flex flex-col items-center space-y-3 border-2 border-muted hover:border-primary hover:bg-primary/5 transition-all duration-200 group"
             >
-              <HelpCircle className="w-5 h-5" />
-              <span className="text-xs">Ajuda</span>
+              <div className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30 group-hover:bg-purple-200 dark:group-hover:bg-purple-800/40 transition-colors">
+                <HelpCircle className="w-6 h-6 text-purple-700 dark:text-purple-400" />
+              </div>
+              <span className="text-sm font-semibold text-foreground group-hover:text-primary">
+                Ajuda
+              </span>
             </Button>
           </div>
         </CardContent>

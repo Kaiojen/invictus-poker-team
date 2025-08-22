@@ -79,7 +79,7 @@ export const getStatusBadge = (status, props = {}) => {
     complete: {
       variant: "default",
       className: "badge-status-complete",
-      text: "Completo",
+      text: "✓ OK",
       icon: CheckCircle,
     },
     pending: {
@@ -131,7 +131,7 @@ export const getStatusMessage = (player) => {
   const status = getPlayerStatus(player);
 
   const messages = {
-    complete: "Planilha em ordem",
+    complete: "",
     pending: buildPendingMessage(player),
     critical: buildCriticalMessage(player),
   };

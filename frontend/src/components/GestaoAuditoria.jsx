@@ -154,6 +154,9 @@ const GestaoAuditoria = ({ user }) => {
         toast.success("Usuário aprovado com sucesso!");
         fetchPendingUsers();
         fetchAuditLogs();
+
+        // ✅ ATUALIZAR CONTADOR NO DASHBOARD PAI
+        window.dispatchEvent(new CustomEvent("refresh-pending-registrations"));
       } else {
         const data = await response.json();
         toast.error(data.error || "Erro ao aprovar usuário");
@@ -179,6 +182,9 @@ const GestaoAuditoria = ({ user }) => {
         fetchPendingUsers();
         fetchAuditLogs();
         setRejectionReason("");
+
+        // ✅ ATUALIZAR CONTADOR NO DASHBOARD PAI
+        window.dispatchEvent(new CustomEvent("refresh-pending-registrations"));
       } else {
         const data = await response.json();
         toast.error(data.error || "Erro ao rejeitar cadastro");
@@ -191,7 +197,7 @@ const GestaoAuditoria = ({ user }) => {
   const exportAuditLogs = async () => {
     try {
       const response = await fetch(
-        `/api/audit/export?days_back=${filters.days_back}`,
+        `/api/audit/export?days_back=${filters.days_back}&format=csv`,
         {
           credentials: "include",
         }
@@ -199,28 +205,90 @@ const GestaoAuditoria = ({ user }) => {
 
       if (response.ok) {
         const blob = await response.blob();
+        const contentDisposition = response.headers.get("content-disposition");
+        const filename = contentDisposition
+          ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+          : `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        toast.success("Logs exportados com sucesso!");
+        toast.success("Logs exportados em CSV com sucesso!");
       }
     } catch (error) {
-      toast.error("Erro ao exportar logs");
+      toast.error("Erro ao exportar logs CSV");
+    }
+  };
+
+  // ✅ EXPORT PDF (mesma qualidade dos outros relatórios)
+  const exportAuditLogsPDF = async () => {
+    try {
+      toast.info("📄 Gerando PDF...", {
+        description: "Aguarde enquanto preparamos o relatório",
+      });
+
+      const response = await fetch(
+        `/api/audit/export?days_back=${filters.days_back}&format=pdf`,
+        {
+          credentials: "include",
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const contentDisposition = response.headers.get("content-disposition");
+        const filename = contentDisposition
+          ? contentDisposition.split("filename=")[1].replace(/"/g, "")
+          : `audit_logs_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("✅ Logs exportados em PDF com sucesso!");
+      } else {
+        // PDF com erro, fallback para CSV
+        toast.warning("⚠️ PDF temporariamente indisponível", {
+          description: "Usando export CSV como alternativa",
+        });
+        exportAuditLogs();
+      }
+    } catch (error) {
+      console.error("Erro ao exportar logs PDF:", error);
+      toast.error("❌ Erro ao exportar PDF", {
+        description: "Tente usar o export CSV",
+      });
     }
   };
 
   const getActionBadgeColor = (action) => {
-    if (action.includes("created")) return "bg-green-500";
-    if (action.includes("updated")) return "bg-blue-500";
+    // ✅ CORES PADRONIZADAS COM O SISTEMA (usando classes do sistema)
+    if (action.includes("created") || action.includes("registration"))
+      return "bg-green-600 hover:bg-green-700";
+    if (
+      action.includes("updated") ||
+      action.includes("balance") ||
+      action.includes("manual")
+    )
+      return "bg-blue-600 hover:bg-blue-700";
     if (action.includes("deleted") || action.includes("rejected"))
-      return "bg-red-500";
-    if (action.includes("approved")) return "bg-emerald-500";
-    return "bg-gray-500";
+      return "bg-red-600 hover:bg-red-700";
+    if (action.includes("approved"))
+      return "bg-emerald-600 hover:bg-emerald-700";
+    if (action.includes("reload") || action.includes("payback"))
+      return "bg-orange-600 hover:bg-orange-700";
+    if (action.includes("withdrawal"))
+      return "bg-purple-600 hover:bg-purple-700";
+    return "bg-slate-600 hover:bg-slate-700";
   };
 
   const formatDate = (dateString) => {
@@ -245,9 +313,6 @@ const GestaoAuditoria = ({ user }) => {
           <h2 className="text-3xl font-bold text-foreground">
             Gestão & Auditoria
           </h2>
-          <p className="text-muted-foreground">
-            Aprovação de cadastros e logs do sistema
-          </p>
         </div>
         <Shield className="w-8 h-8 text-yellow-500" />
       </div>
@@ -400,10 +465,16 @@ const GestaoAuditoria = ({ user }) => {
                   <FileText className="w-5 h-5" />
                   Logs de Auditoria
                 </div>
-                <Button onClick={exportAuditLogs} variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar CSV
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={exportAuditLogs} variant="outline">
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportar CSV
+                  </Button>
+                  <Button onClick={exportAuditLogsPDF} variant="outline">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Exportar PDF
+                  </Button>
+                </div>
               </CardTitle>
               <CardDescription>
                 Histórico completo de ações no sistema
@@ -411,7 +482,7 @@ const GestaoAuditoria = ({ user }) => {
             </CardHeader>
             <CardContent>
               {/* Filtros */}
-              <div className="flex gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+              <div className="flex gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
                 <div className="flex-1">
                   <Label htmlFor="action-filter">Filtrar por ação</Label>
                   <Input
@@ -537,7 +608,7 @@ const GestaoAuditoria = ({ user }) => {
                                 {selectedLog.old_values && (
                                   <div>
                                     <Label>Valores Antigos</Label>
-                                    <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1 overflow-auto">
+                                    <pre className="text-xs bg-muted/30 border border-border p-2 rounded mt-1 overflow-auto">
                                       {JSON.stringify(
                                         JSON.parse(selectedLog.old_values),
                                         null,
@@ -549,7 +620,7 @@ const GestaoAuditoria = ({ user }) => {
                                 {selectedLog.new_values && (
                                   <div>
                                     <Label>Valores Novos</Label>
-                                    <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded mt-1 overflow-auto">
+                                    <pre className="text-xs bg-muted/30 border border-border p-2 rounded mt-1 overflow-auto">
                                       {JSON.stringify(
                                         JSON.parse(selectedLog.new_values),
                                         null,

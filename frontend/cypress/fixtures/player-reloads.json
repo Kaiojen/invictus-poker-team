@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "amount": 500.0,
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "status": "approved",
+    "player_notes": "Sessão importante",
+    "manager_notes": "Aprovado automaticamente",
+    "created_at": "2025-01-15T10:30:00Z",
+    "updated_at": "2025-01-15T11:00:00Z"
+  },
+  {
+    "id": 2,
+    "amount": 300.0,
+    "platform": {
+      "name": "gg",
+      "display_name": "GGPoker"
+    },
+    "status": "pending",
+    "player_notes": "Preciso para torneio",
+    "manager_notes": null,
+    "created_at": "2025-01-16T09:15:00Z",
+    "updated_at": "2025-01-16T09:15:00Z"
+  },
+  {
+    "id": 3,
+    "amount": 200.0,
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "status": "rejected",
+    "player_notes": "Cash game",
+    "manager_notes": "Limite mensal atingido",
+    "created_at": "2025-01-14T14:20:00Z",
+    "updated_at": "2025-01-14T16:45:00Z"
+  }
+]

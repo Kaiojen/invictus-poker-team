@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session, make_response
 from datetime import datetime, timedelta
-from src.models.models import User, UserRole, Reta
+from sqlalchemy import func, extract
+from src.models.models import User, UserRole, Reta, db, Account, ReloadRequest, ReloadStatus, WithdrawalRequest, WithdrawalStatus
 from src.routes.auth import login_required, admin_required
 from src.utils.report_generator import get_report_generator
 import logging
@@ -425,3 +426,190 @@ def preview_report_data(report_type):
         logger.error(f"Erro ao gerar preview do relatório: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+
+@reports_bp.route('/monthly-detailed', methods=['GET'])
+@login_required  
+def generate_monthly_detailed_report():
+    """Gerar relatório mensal detalhado para substituir snapshots"""
+    try:
+        current_user = User.query.get(session['user_id'])
+        
+        if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
+            return jsonify({'error': 'Access denied'}), 403
+        
+        # Parâmetros
+        month = request.args.get('month', type=int) or datetime.now().month
+        year = request.args.get('year', type=int) or datetime.now().year
+        
+        # Data range for the month
+        start_date = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1)
+        else:
+            end_date = datetime(year, month + 1, 1)
+        
+        # 1. TOTAL DE RELOADS DO MÊS
+        total_reloads = db.session.query(func.sum(ReloadRequest.amount)).filter(
+            ReloadRequest.status == ReloadStatus.APPROVED,
+            ReloadRequest.approved_at >= start_date,
+            ReloadRequest.approved_at < end_date
+        ).scalar() or 0
+        
+        # 2. TOTAL DE SAQUES DO MÊS
+        from src.models.models import WithdrawalRequest, WithdrawalStatus
+        total_withdrawals = db.session.query(func.sum(WithdrawalRequest.amount)).filter(
+            WithdrawalRequest.status.in_([WithdrawalStatus.APPROVED, WithdrawalStatus.COMPLETED]),
+            WithdrawalRequest.approved_at >= start_date,
+            WithdrawalRequest.approved_at < end_date
+        ).scalar() or 0
+        
+        # 📊 RELATÓRIO DETALHADO CONFORME SOLICITADO
+        
+        # Obter todos os jogadores ativos
+        players = User.query.filter(User.role == UserRole.PLAYER, User.is_active == True).all()
+        players_summary = []
+        
+        total_team_investment = 0.0
+        total_team_withdrawals = 0.0
+        total_player_withdrawals = 0.0
+        platform_balances = {}
+        profitable_players = []
+        
+        for player in players:
+            # Contas do jogador
+            player_accounts = Account.query.filter_by(user_id=player.id, is_active=True).all()
+            
+            # Saldos por plataforma para este jogador
+            player_balances = {}
+            total_player_balance = 0.0
+            total_player_investment = 0.0
+            
+            for account in player_accounts:
+                platform_name = account.platform.name if account.platform else "Unknown"
+                balance = float(account.current_balance or 0)
+                investment = float(account.manual_team_investment or account.initial_balance or 0)
+                
+                player_balances[platform_name] = {
+                    'current_balance': balance,
+                    'investment': investment,
+                    'pnl': balance - investment
+                }
+                
+                total_player_balance += balance
+                total_player_investment += investment
+                
+                # Acumular saldos por plataforma global
+                if platform_name not in platform_balances:
+                    platform_balances[platform_name] = {'balance': 0, 'investment': 0, 'pnl': 0}
+                platform_balances[platform_name]['balance'] += balance
+                platform_balances[platform_name]['investment'] += investment
+                platform_balances[platform_name]['pnl'] += (balance - investment)
+            
+            # Reloads do jogador no mês
+            player_monthly_reloads = db.session.query(func.sum(ReloadRequest.amount)).filter(
+                ReloadRequest.user_id == player.id,
+                ReloadRequest.status == ReloadStatus.APPROVED,
+                ReloadRequest.approved_at >= start_date,
+                ReloadRequest.approved_at < end_date
+            ).scalar() or 0
+            
+            # Saques do jogador no mês
+            player_monthly_withdrawals = db.session.query(func.sum(WithdrawalRequest.amount)).filter(
+                WithdrawalRequest.user_id == player.id,
+                WithdrawalRequest.status == WithdrawalStatus.COMPLETED,
+                WithdrawalRequest.approved_at >= start_date,
+                WithdrawalRequest.approved_at < end_date
+            ).scalar() or 0
+            
+            player_pnl = total_player_balance - total_player_investment
+            
+            # Dados do jogador para o relatório
+            player_data = {
+                'id': player.id,
+                'name': player.full_name,
+                'username': player.username,
+                'total_balance': total_player_balance,
+                'total_investment': total_player_investment,
+                'pnl': player_pnl,
+                'monthly_reloads': float(player_monthly_reloads),
+                'monthly_withdrawals': float(player_monthly_withdrawals),
+                'platform_balances': player_balances,
+                'is_profitable': player_pnl > 0
+            }
+            
+            players_summary.append(player_data)
+            
+            # Acumular totais
+            total_team_investment += total_player_investment
+            total_team_withdrawals += float(player_monthly_reloads)  # Reloads = investimento do time
+            total_player_withdrawals += float(player_monthly_withdrawals)  # Saques = retirada dos jogadores
+            
+            # Jogadores lucrativos
+            if player_pnl > 0:
+                profitable_players.append({
+                    'name': player.full_name,
+                    'pnl': player_pnl
+                })
+        
+        # Ordenar por lucratividade
+        players_summary.sort(key=lambda x: x['pnl'], reverse=True)
+        profitable_players.sort(key=lambda x: x['pnl'], reverse=True)
+        
+        report_data = {
+            'period': {
+                'month': month,
+                'year': year,
+                'month_name': start_date.strftime('%B %Y'),
+                'generated_at': datetime.utcnow().isoformat()
+            },
+            'financial_summary': {
+                'total_reloads': float(total_reloads),
+                'total_withdrawals': float(total_withdrawals),
+                'net_movement': float(total_reloads) - float(total_withdrawals),
+                'total_team_investment': total_team_investment,
+                'total_team_withdrawals': total_team_withdrawals,  # Reloads dados ao time
+                'total_player_withdrawals': total_player_withdrawals,  # Saques pelos jogadores
+                'team_net_result': total_player_withdrawals - total_team_withdrawals  # Lucro líquido do time
+            },
+            'players_summary': players_summary,
+            'profitable_players': profitable_players,
+            'platform_balances': platform_balances,
+            'statistics': {
+                'total_players': len(players),
+                'profitable_players_count': len(profitable_players),
+                'profitable_players_percentage': (len(profitable_players) / len(players) * 100) if players else 0,
+                'active_platforms': len(platform_balances),
+                'avg_player_pnl': sum([p['pnl'] for p in players_summary]) / len(players_summary) if players_summary else 0
+            }
+        }
+        
+        # ✅ VERIFICAR FORMATO DE SAÍDA
+        output_format = request.args.get('format', 'json').lower()
+        
+        if output_format == 'pdf':
+            # ✅ GERAR PDF (mesmo padrão dos outros relatórios)
+            try:
+                report_generator = get_report_generator()
+                pdf_content = report_generator.generate_monthly_detailed_pdf(report_data)
+                
+                # Criar resposta com PDF
+                response = make_response(pdf_content)
+                response.headers['Content-Type'] = 'application/pdf'
+                response.headers['Content-Disposition'] = f'attachment; filename="relatorio_mensal_detalhado_{year}_{month:02d}.pdf"'
+                
+                return response
+                
+            except Exception as pdf_error:
+                logger.error(f"Erro ao gerar PDF: {str(pdf_error)}")
+                # Retornar erro específico para debug
+                return jsonify({
+                    'error': f'Erro ao gerar PDF: {str(pdf_error)}',
+                    'fallback_data': report_data
+                }), 500
+        else:
+            # Retornar JSON para outros formatos
+            return jsonify(report_data), 200
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar relatório mensal detalhado: {str(e)}")
+        return jsonify({'error': str(e)}), 500

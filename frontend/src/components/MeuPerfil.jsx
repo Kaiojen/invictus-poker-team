@@ -496,7 +496,7 @@ const MeuPerfil = ({ user, userRole }) => {
                               <strong>Makeup:</strong> Valor devido ao time
                               quando o jogador está negativo após um saque.
                               Representa o saldo a ser compensado em futuras
-                              sessões positivas.
+                              resultados positivos.
                             </p>
                           </TooltipContent>
                         </Tooltip>

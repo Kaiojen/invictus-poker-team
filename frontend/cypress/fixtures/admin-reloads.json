@@ -1,0 +1,53 @@
+[
+  {
+    "id": 1,
+    "amount": 500.0,
+    "user": {
+      "username": "player1",
+      "full_name": "João Silva"
+    },
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "status": "pending",
+    "player_notes": "Necessário para sessão importante",
+    "manager_notes": null,
+    "created_at": "2025-01-16T10:30:00Z",
+    "updated_at": "2025-01-16T10:30:00Z"
+  },
+  {
+    "id": 2,
+    "amount": 300.0,
+    "user": {
+      "username": "player2",
+      "full_name": "Maria Santos"
+    },
+    "platform": {
+      "name": "gg",
+      "display_name": "GGPoker"
+    },
+    "status": "pending",
+    "player_notes": "Torneio de domingo",
+    "manager_notes": null,
+    "created_at": "2025-01-16T09:15:00Z",
+    "updated_at": "2025-01-16T09:15:00Z"
+  },
+  {
+    "id": 3,
+    "amount": 750.0,
+    "user": {
+      "username": "player1",
+      "full_name": "João Silva"
+    },
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "status": "approved",
+    "player_notes": "Cash game regular",
+    "manager_notes": "Aprovado - jogador regular",
+    "created_at": "2025-01-15T14:20:00Z",
+    "updated_at": "2025-01-15T15:10:00Z"
+  }
+]

@@ -5,6 +5,7 @@ from werkzeug.security import generate_password_hash
 from datetime import datetime, date
 import re
 import json
+import time
 
 registration_bp = Blueprint('registration', __name__)
 
@@ -155,7 +156,44 @@ def register_player():
             user_agent=user_agent
         )
         db.session.add(audit_log)
+        
+        # Criar notificação para admin/manager
+        from src.models.notifications import Notification, NotificationType, NotificationCategory
+        
+        # Notificar todos os admins
+        admins = User.query.filter(User.role.in_([UserRole.ADMIN, UserRole.MANAGER])).all()
+        for admin in admins:
+            notification = Notification(
+                user_id=admin.id,
+                title="Novo Cadastro de Jogador",
+                message=f"O jogador {new_user.full_name} (@{new_user.username}) se cadastrou e está aguardando aprovação.",
+                notification_type=NotificationType.ACTION_REQUIRED,
+                category=NotificationCategory.REGISTRATION,
+                is_urgent=True,
+                related_entity_type='User',
+                related_entity_id=new_user.id,
+                action_url='/dashboard?tab=gestao&subtab=jogadores'
+            )
+            db.session.add(notification)
+        
         db.session.commit()
+        
+        # Broadcast via SSE
+        from src.routes.sse import broadcast_to_role
+        broadcast_to_role(UserRole.ADMIN, 'new_registration', {
+            'user_id': new_user.id,
+            'username': new_user.username,
+            'full_name': new_user.full_name,
+            'message': f'Novo cadastro: {new_user.full_name}',
+            'timestamp': time.time()
+        })
+        broadcast_to_role(UserRole.MANAGER, 'new_registration', {
+            'user_id': new_user.id,
+            'username': new_user.username,
+            'full_name': new_user.full_name,
+            'message': f'Novo cadastro: {new_user.full_name}',
+            'timestamp': time.time()
+        })
         
         return jsonify({
             'message': 'Cadastro realizado com sucesso! Aguarde aprovação do gestor.',

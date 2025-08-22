@@ -23,63 +23,26 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload, DollarSign, AlertTriangle, CheckCircle } from "lucide-react";
 
 const ReloadRequestModal = ({ isOpen, onClose, userId, onSuccess }) => {
-  const [platforms, setPlatforms] = useState([]);
-  const [userAccounts, setUserAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
-  const [formData, setFormData] = useState({
-    platform_id: "",
-    amount: "",
-    player_notes: "",
-  });
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [userAccounts, setUserAccounts] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchPlatforms();
       fetchUserAccounts();
       setError("");
       setSuccess(false);
-      setFormData({
-        platform_id: "",
-        amount: "",
-        player_notes: "",
-      });
+      setAmount("");
+      setNotes("");
     }
   }, [isOpen, userId]);
 
-  // Auto-selecionar Luxon quando as plataformas são carregadas
-  useEffect(() => {
-    if (platforms.length > 0 && !formData.platform_id) {
-      const luxonPlatform = platforms.find((p) => p.name === "luxon");
-      if (luxonPlatform) {
-        setFormData((prev) => ({
-          ...prev,
-          platform_id: luxonPlatform.id.toString(),
-        }));
-      }
-    }
-  }, [platforms, formData.platform_id]);
-
-  const fetchPlatforms = async () => {
-    try {
-      const response = await fetch("/api/platforms", {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPlatforms(data.platforms.filter((p) => p.is_active));
-      }
-    } catch (err) {
-      console.error("Erro ao carregar plataformas:", err);
-    }
-  };
-
   const fetchUserAccounts = async () => {
     try {
-      const response = await fetch(`/api/accounts?user_id=${userId}`, {
+      const response = await fetch(`/api/accounts/?user_id=${userId}`, {
         credentials: "include",
       });
 
@@ -98,47 +61,33 @@ const ReloadRequestModal = ({ isOpen, onClose, userId, onSuccess }) => {
     setError("");
 
     try {
-      // Validações
-      if (!formData.platform_id) {
-        setError("Selecione uma plataforma");
+      if (!amount || parseFloat(amount) <= 0) {
+        setError("Informe um valor válido");
         return;
       }
 
-      if (!formData.amount || parseFloat(formData.amount) <= 0) {
-        setError("Informe um valor válido maior que zero");
-        return;
-      }
-
-      // Para Luxon, não é necessário verificar conta (vai direto para aprovação)
-      const selectedPlatform = platforms.find(
-        (p) => p.id === parseInt(formData.platform_id)
+      // Encontrar LuxonPay ou primeira conta ativa
+      let targetPlatform = userAccounts.find(
+        (acc) =>
+          acc.platform_name && acc.platform_name.toLowerCase().includes("luxon")
       );
-      const isLuxon = selectedPlatform?.name === "luxon";
 
-      if (!isLuxon) {
-        // Verificar se usuário tem conta na plataforma apenas para outras plataformas
-        const hasAccount = userAccounts.some(
-          (acc) =>
-            acc.platform_id === parseInt(formData.platform_id) &&
-            acc.has_account
-        );
-
-        if (!hasAccount) {
-          setError("Você não possui conta ativa nesta plataforma");
-          return;
-        }
+      if (!targetPlatform) {
+        targetPlatform = userAccounts.find((acc) => acc.has_account);
       }
 
-      const response = await fetch("/api/reload-requests", {
+      if (!targetPlatform) {
+        setError("Nenhuma conta disponível para reload");
+        return;
+      }
+
+      const response = await fetch("/api/reload-requests/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
-          platform_id: parseInt(formData.platform_id),
-          amount: parseFloat(formData.amount),
-          user_id: userId,
+          platform_id: targetPlatform.platform_id,
+          amount: parseFloat(amount),
+          player_notes: notes || "Solicitação de reload",
         }),
         credentials: "include",
       });
@@ -150,173 +99,112 @@ const ReloadRequestModal = ({ isOpen, onClose, userId, onSuccess }) => {
         setTimeout(() => {
           onSuccess && onSuccess(data.reload_request);
           onClose();
-        }, 2000);
+          setAmount("");
+          setNotes("");
+        }, 1500);
       } else {
         setError(data.error || "Erro ao criar solicitação");
       }
     } catch (err) {
-      setError("Erro de conexão com o servidor");
+      setError("Erro de conexão");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const getSelectedPlatform = () => {
-    return platforms.find((p) => p.id === parseInt(formData.platform_id));
-  };
-
-  const getAccountForPlatform = () => {
-    return userAccounts.find(
-      (acc) => acc.platform_id === parseInt(formData.platform_id)
-    );
   };
 
   const formatCurrency = (value) => formatUSD(value);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="gradient-gold-text flex items-center">
-            <Upload className="w-5 h-5 mr-2" />
-            Solicitar Reload
+          <DialogTitle className="text-xl font-bold text-foreground">
+            💰 Solicitar Reload
           </DialogTitle>
-          <DialogDescription>
-            Preencha os dados para solicitar um reload em sua conta.
+          <DialogDescription className="text-foreground/70">
+            Solicite um reload para sua conta
           </DialogDescription>
         </DialogHeader>
 
         {success ? (
-          <div className="text-center py-8">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Solicitação Criada!</h3>
-            <p className="text-muted-foreground">
-              Sua solicitação de reload foi enviada e está aguardando aprovação.
+          <div className="text-center py-6">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+            <h3 className="font-semibold mb-2 text-foreground">
+              Solicitação Enviada!
+            </h3>
+            <p className="text-sm text-foreground/70">
+              Aguardando aprovação do admin
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="text-red-700 dark:text-red-300 font-medium">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="platform">Plataforma</Label>
-              <Select
-                value={formData.platform_id}
-                onValueChange={(value) => handleChange("platform_id", value)}
-                disabled={loading}
+            <div>
+              <Label
+                htmlFor="amount"
+                className="text-base font-bold text-foreground"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  {platforms.map((platform) => {
-                    const account = userAccounts.find(
-                      (acc) => acc.platform_id === platform.id
-                    );
-                    const hasAccount = account && account.has_account;
-
-                    return (
-                      <SelectItem
-                        key={platform.id}
-                        value={platform.id.toString()}
-                        disabled={!hasAccount}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span>{platform.display_name}</span>
-                          {hasAccount ? (
-                            <span className="text-xs text-green-500 ml-2">
-                              {formatCurrency(account.current_balance)}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground ml-2">
-                              Sem conta
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-
-              {formData.platform_id && (
-                <div className="text-sm text-muted-foreground">
-                  {(() => {
-                    const account = getAccountForPlatform();
-                    if (account && account.has_account) {
-                      return (
-                        <div className="flex justify-between bg-secondary/20 p-2 rounded">
-                          <span>Saldo atual:</span>
-                          <span className="font-medium invictus-gold">
-                            {formatCurrency(account.current_balance)}
-                          </span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">Valor do Reload</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                💵 Valor do Reload
+              </Label>
+              <div className="relative mt-2">
+                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-green-600" />
                 <Input
                   id="amount"
                   type="number"
                   step="0.01"
                   min="0.01"
-                  placeholder="0.00"
-                  value={formData.amount}
-                  onChange={(e) => handleChange("amount", e.target.value)}
-                  className="pl-10"
+                  placeholder="100.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="pl-10 h-12 text-lg text-foreground bg-background border-2"
                   disabled={loading}
                   required
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Observações (opcional)</Label>
+            <div>
+              <Label
+                htmlFor="notes"
+                className="text-base font-bold text-foreground"
+              >
+                📝 Motivo (opcional)
+              </Label>
               <Textarea
                 id="notes"
-                placeholder="Motivo do reload, observações adicionais..."
-                value={formData.player_notes}
-                onChange={(e) => handleChange("player_notes", e.target.value)}
+                placeholder="Ex: Sessão perdida, preciso de mais bankroll..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 disabled={loading}
+                className="mt-2 text-foreground bg-background border-2"
               />
             </div>
 
-            <div className="flex justify-end space-x-3">
+            <div className="flex gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={loading}
+                className="flex-1 border-2 text-foreground hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-950/20"
               >
-                Cancelar
+                ❌ Cancelar
               </Button>
               <Button
                 type="submit"
-                disabled={loading || !formData.platform_id || !formData.amount}
-                className="gradient-gold"
+                disabled={loading || !amount}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold"
               >
-                {loading ? "Enviando..." : "Solicitar Reload"}
+                {loading ? "Enviando..." : "🚀 Solicitar"}
               </Button>
             </div>
           </form>

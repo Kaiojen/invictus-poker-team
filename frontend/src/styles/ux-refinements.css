@@ -1,0 +1,362 @@
+/* 
+ * UX Refinements - Phase 6
+ * Melhorias finais de experiência do usuário
+ */
+
+/* ========================================
+   1. MELHORIAS DE LOADING E FEEDBACK
+   ======================================== */
+
+/* Loading spinners mais suaves */
+.loading-spinner {
+  animation: smooth-spin 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+}
+
+@keyframes smooth-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Estados de loading para botões */
+.button-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.button-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: smooth-spin 1s linear infinite;
+}
+
+/* ========================================
+   2. MELHORIAS DE HOVER E INTERAÇÃO
+   ======================================== */
+
+/* Hover effects mais suaves */
+.card-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Botões com feedback visual melhorado */
+.button-enhanced {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.button-enhanced::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.button-enhanced:hover::before {
+  left: 100%;
+}
+
+/* ========================================
+   3. MELHORIAS DE LAYOUT E ESPAÇAMENTO
+   ======================================== */
+
+/* Espaçamento consistente para cards */
+.card-consistent {
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+}
+
+/* Grid responsivo melhorado */
+.responsive-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+@media (max-width: 768px) {
+  .responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .card-consistent {
+    padding: 1rem;
+  }
+}
+
+/* ========================================
+   4. MELHORIAS DE ACESSIBILIDADE
+   ======================================== */
+
+/* Focus states mais visíveis */
+.focus-enhanced:focus {
+  outline: 2px solid #d4af37;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+}
+
+/* Textos com contraste melhorado */
+.text-high-contrast {
+  color: #1a1a1a;
+}
+
+.dark .text-high-contrast {
+  color: #ffffff;
+}
+
+/* ========================================
+   5. MICRO-INTERAÇÕES E ANIMAÇÕES
+   ======================================== */
+
+/* Fade in suave para elementos que aparecem */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide in para modais */
+.slide-in {
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Bounce para notificações */
+.notification-bounce {
+  animation: bounceIn 0.5s ease-out;
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ========================================
+   6. MELHORIAS DE STATUS E INDICADORES
+   ======================================== */
+
+/* Indicators de status mais claros */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-indicator.success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #059669;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.status-indicator.warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.status-indicator.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-indicator.info {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* ========================================
+   7. MELHORIAS DE TABELAS E LISTAS
+   ======================================== */
+
+/* Zebra striping mais sutil */
+.table-enhanced tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.dark .table-enhanced tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Hover em linhas de tabela */
+.table-enhanced tbody tr:hover {
+  background: rgba(212, 175, 55, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+/* ========================================
+   8. MELHORIAS DE FORMULÁRIOS
+   ======================================== */
+
+/* Labels flutuantes e campos mais claros */
+.form-field {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.form-field input:focus + label,
+.form-field input:not(:placeholder-shown) + label {
+  transform: translateY(-1.5rem) scale(0.85);
+  color: #d4af37;
+}
+
+.form-field label {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  color: #6b7280;
+}
+
+/* ========================================
+   9. MELHORIAS DE TOAST E NOTIFICAÇÕES
+   ======================================== */
+
+/* Toasts com melhor posicionamento e animação */
+.toast-enhanced {
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* ========================================
+   10. MELHORIAS DE RESPONSIVIDADE
+   ======================================== */
+
+/* Stack em mobile para layouts complexos */
+@media (max-width: 640px) {
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  .mobile-stack > * {
+    width: 100% !important;
+  }
+
+  .mobile-full-width {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
+
+/* ========================================
+   11. MELHORIAS DE PERFORMANCE VISUAL
+   ======================================== */
+
+/* Smooth scrolling */
+.smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+/* Optimização de will-change para elementos animados */
+.will-animate {
+  will-change: transform, opacity;
+}
+
+/* ========================================
+   12. UTILIDADES GERAIS
+   ======================================== */
+
+/* Truncate text com tooltip */
+.truncate-with-tooltip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* Glass effect para elementos especiais */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient text para títulos especiais */
+.gradient-text {
+  background: linear-gradient(135deg, #d4af37, #ffd700);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

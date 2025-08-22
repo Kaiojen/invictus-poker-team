@@ -34,6 +34,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Users,
   Target,
   Crown,
@@ -44,8 +52,22 @@ import {
   X,
   Filter,
   Search,
+  MoreVertical,
+  FileSpreadsheet,
+  UserCheck,
+  ClipboardCheck,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 
 const PlayerManagement = ({ userRole }) => {
   const [players, setPlayers] = useState([]);
@@ -56,6 +78,11 @@ const PlayerManagement = ({ userRole }) => {
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [playerCompleteness, setPlayerCompleteness] = useState({});
+  const [playerRequests, setPlayerRequests] = useState({});
+
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [playersPerPage] = useState(10);
 
   useEffect(() => {
     fetchPlayers();
@@ -169,18 +196,23 @@ const PlayerManagement = ({ userRole }) => {
 
   const getRetaColor = (retaId) => {
     const colors = {
-      1: "bg-green-500", // Reta 0
-      2: "bg-blue-500", // Reta 1
-      3: "bg-yellow-500", // Reta 2
-      4: "bg-red-500", // Reta 3
+      1: "bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-500", // Reta 0
+      2: "bg-blue-600 hover:bg-blue-700 text-white border border-blue-500", // Reta 1
+      3: "bg-amber-600 hover:bg-amber-700 text-black border border-amber-500", // Reta 2
+      4: "bg-rose-600 hover:bg-rose-700 text-white border border-rose-500", // Reta 3
     };
-    return colors[retaId] || "bg-gray-500";
+    return (
+      colors[retaId] ||
+      "bg-slate-600 hover:bg-slate-700 text-white border border-slate-500"
+    );
   };
 
   const getPlayerStatus = (player) => {
-    if (player.makeup > 0) return "critical";
-    if (player.total_balance > 0) return "profit";
-    return "even";
+    // P&L baseado: negativo = crítico, positivo = lucro, zero = neutro
+    const pnl = (player.total_balance || 0) - (player.total_investment || 0);
+    if (pnl < 0) return "critical"; // Prejuízo (P)
+    if (pnl > 0) return "profit"; // Lucro (L)
+    return "even"; // Neutro
   };
 
   const getStatusColor = (status) => {
@@ -191,6 +223,64 @@ const PlayerManagement = ({ userRole }) => {
         return "text-red-400";
       default:
         return "text-gray-400";
+    }
+  };
+
+  const fetchPlayerRequests = async (playerId) => {
+    try {
+      // Buscar reloads pendentes
+      const reloadRes = await fetch(
+        `/api/reload_requests/?user_id=${playerId}&status=pending`,
+        {
+          credentials: "include",
+        }
+      );
+
+      // Buscar saques pendentes
+      const withdrawalRes = await fetch(
+        `/api/withdrawal_requests/?user_id=${playerId}&status=pending`,
+        {
+          credentials: "include",
+        }
+      );
+
+      const requests = {
+        reloads: [],
+        withdrawals: [],
+      };
+
+      if (reloadRes.ok) {
+        const reloadData = await reloadRes.json();
+        requests.reloads = reloadData.reload_requests || [];
+      }
+
+      if (withdrawalRes.ok) {
+        const withdrawalData = await withdrawalRes.json();
+        requests.withdrawals = withdrawalData.withdrawal_requests || [];
+      }
+
+      const totalRequests =
+        requests.reloads.length + requests.withdrawals.length;
+
+      if (totalRequests > 0) {
+        toast.info(
+          `${totalRequests} solicitação(ões) pendente(s): ${requests.reloads.length} reload(s) + ${requests.withdrawals.length} saque(s)`,
+          { duration: 4000 }
+        );
+      } else {
+        toast.success("Nenhuma solicitação pendente para este jogador");
+      }
+
+      setPlayerRequests((prev) => ({
+        ...prev,
+        [playerId]: requests,
+      }));
+    } catch (err) {
+      console.error(
+        `Erro ao carregar solicitações do jogador ${playerId}:`,
+        err
+      );
+      toast.error("Erro ao carregar solicitações");
     }
   };
 
@@ -206,6 +296,20 @@ const PlayerManagement = ({ userRole }) => {
 
     return matchesSearch && matchesReta;
   });
+
+  // Paginação
+  const totalPages = Math.ceil(filteredPlayers.length / playersPerPage);
+  const indexOfLastPlayer = currentPage * playersPerPage;
+  const indexOfFirstPlayer = indexOfLastPlayer - playersPerPage;
+  const currentPlayers = filteredPlayers.slice(
+    indexOfFirstPlayer,
+    indexOfLastPlayer
+  );
+
+  // Reset para primeira página quando filtros mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedReta]);
 
   const formatCurrency = (value) =>
     new Intl.NumberFormat("en-US", {
@@ -286,7 +390,8 @@ const PlayerManagement = ({ userRole }) => {
         <CardHeader>
           <CardTitle>Jogadores Cadastrados</CardTitle>
           <CardDescription>
-            {filteredPlayers.length} jogador(es) encontrado(s)
+            {filteredPlayers.length} jogador(es) encontrado(s) - Página{" "}
+            {currentPage} de {totalPages}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -296,14 +401,14 @@ const PlayerManagement = ({ userRole }) => {
                 <TableHead>Jogador</TableHead>
                 <TableHead>Reta Atual</TableHead>
                 <TableHead>Saldo Total</TableHead>
-                <TableHead>Makeup</TableHead>
+                <TableHead>P&L Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Contas</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPlayers.map((player) => (
+              {currentPlayers.map((player) => (
                 <TableRow key={player.id}>
                   <TableCell>
                     <div>
@@ -323,9 +428,7 @@ const PlayerManagement = ({ userRole }) => {
                         <div className="text-xs mt-1">
                           {playerCompleteness[player.id].status ===
                           "complete" ? (
-                            <span className="text-green-600">
-                              ✓ 100% Completo
-                            </span>
+                            <span className="text-green-600">✓ OK</span>
                           ) : (
                             <span className="text-red-600">
                               {playerCompleteness[player.id].completeness}% -
@@ -345,9 +448,7 @@ const PlayerManagement = ({ userRole }) => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      className={`${getRetaColor(player.reta_id)} text-white`}
-                    >
+                    <Badge className={getRetaColor(player.reta_id)}>
                       <Target className="w-3 h-3 mr-1" />
                       {getRetaName(player.reta_id)}
                     </Badge>
@@ -358,13 +459,24 @@ const PlayerManagement = ({ userRole }) => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    {player.makeup > 0 ? (
-                      <span className="text-red-400">
-                        {formatCurrency(player.makeup)}
-                      </span>
-                    ) : (
-                      <span className="text-green-400">$ 0.00</span>
-                    )}
+                    {(() => {
+                      const pnl =
+                        (player.total_balance || 0) -
+                        (player.total_investment || 0);
+                      return (
+                        <span
+                          className={
+                            pnl < 0
+                              ? "text-red-400"
+                              : pnl > 0
+                              ? "text-green-400"
+                              : "text-gray-400"
+                          }
+                        >
+                          {formatCurrency(pnl)}
+                        </span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -383,9 +495,9 @@ const PlayerManagement = ({ userRole }) => {
                         <TrendingDown className="w-3 h-3 mr-1" />
                       )}
                       {getPlayerStatus(player) === "profit"
-                        ? "Lucro"
+                        ? "Lucro (L)"
                         : getPlayerStatus(player) === "critical"
-                        ? "Makeup"
+                        ? "Prejuízo (P)"
                         : "Neutro"}
                     </Badge>
                   </TableCell>
@@ -396,65 +508,196 @@ const PlayerManagement = ({ userRole }) => {
                   </TableCell>
                   <TableCell className="text-right">
                     {userRole === "admin" && (
-                      <Dialog
-                        open={showEditModal && editingPlayer?.id === player.id}
-                        onOpenChange={(open) => {
-                          setShowEditModal(open);
-                          if (!open) setEditingPlayer(null);
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setEditingPlayer(player)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Editar Jogador</DialogTitle>
-                            <DialogDescription>
-                              Alterar reta de {player.full_name}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="nova-reta">Nova Reta</Label>
-                              <Select
-                                defaultValue={player.reta_id?.toString()}
-                                onValueChange={(value) =>
-                                  handleUpdatePlayerReta(player.id, value)
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione uma reta" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {retas.map((reta) => (
-                                    <SelectItem
-                                      key={reta.id}
-                                      value={reta.id.toString()}
-                                    >
-                                      {reta.name} (${reta.min_stake} - $
-                                      {reta.max_stake})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <div className="flex items-center space-x-2">
+                        {/* Dropdown de ações */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+
+                            {/* Ver Solicitações na Planilha */}
+                            <DropdownMenuItem
+                              onClick={() => {
+                                // Redirecionar para a planilha do jogador
+                                sessionStorage.setItem(
+                                  "selectedPlayerId",
+                                  String(player.id)
+                                );
+                                sessionStorage.setItem(
+                                  "planilhaFocus",
+                                  "solicitacoes"
+                                );
+                                window.dispatchEvent(
+                                  new CustomEvent("navigateToTab", {
+                                    detail: {
+                                      tab: "planilha",
+                                      playerId: player.id,
+                                    },
+                                  })
+                                );
+                              }}
+                            >
+                              <FileSpreadsheet className="w-4 h-4 mr-2" />
+                              Ver Solicitações
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Editar Reta */}
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingPlayer(player);
+                                setShowEditModal(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Editar Reta
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+
+          {/* Paginação */}
+          {totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
+                      className={
+                        currentPage === 1
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+
+                  {/* Números das páginas */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNumber;
+                    if (totalPages <= 5) {
+                      pageNumber = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNumber = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNumber = totalPages - 4 + i;
+                    } else {
+                      pageNumber = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <PaginationItem key={pageNumber}>
+                        <PaginationLink
+                          onClick={() => setCurrentPage(pageNumber)}
+                          isActive={currentPage === pageNumber}
+                          className="cursor-pointer"
+                        >
+                          {pageNumber}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+
+                  {totalPages > 5 && currentPage < totalPages - 2 && (
+                    <PaginationItem>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  )}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      }
+                      className={
+                        currentPage === totalPages
+                          ? "pointer-events-none opacity-50"
+                          : "cursor-pointer"
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Modal de Edição de Reta */}
+      {editingPlayer && (
+        <Dialog
+          open={showEditModal}
+          onOpenChange={(open) => {
+            setShowEditModal(open);
+            if (!open) setEditingPlayer(null);
+          }}
+        >
+          <DialogContent className="player-edit-modal system-harmony-fix">
+            <DialogHeader>
+              <DialogTitle className="text-yellow-400 font-semibold text-lg">
+                ✏️ Editar Jogador
+              </DialogTitle>
+              <DialogDescription className="text-gray-300">
+                Alterar reta de {editingPlayer.full_name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label
+                  htmlFor="nova-reta"
+                  className="text-gray-200 font-medium flex items-center gap-2"
+                >
+                  🎯 Nova Reta
+                </Label>
+                <Select
+                  defaultValue={editingPlayer.reta_id?.toString()}
+                  onValueChange={(value) =>
+                    handleUpdatePlayerReta(editingPlayer.id, value)
+                  }
+                >
+                  <SelectTrigger className="bg-gray-700 border-2 border-yellow-500 text-white">
+                    <SelectValue placeholder="Selecione uma reta" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-yellow-500">
+                    {retas.map((reta) => (
+                      <SelectItem
+                        key={reta.id}
+                        value={reta.id.toString()}
+                        className="text-white hover:bg-gray-700"
+                      >
+                        {reta.name} (${reta.min_stake} - ${reta.max_stake})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowEditModal(false)}
+                className="bg-gray-600 border-gray-500 text-gray-200 hover:bg-gray-500 hover:text-white"
+              >
+                ❌ Cancelar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

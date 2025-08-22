@@ -18,6 +18,7 @@ import {
   AreaChart,
 } from "recharts";
 import { TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { useSSE } from "../hooks/useSSE";
 
 const BankrollChart = ({ playerId }) => {
   const [chartData, setChartData] = useState([]);
@@ -29,11 +30,44 @@ const BankrollChart = ({ playerId }) => {
     lowestBalance: 0,
   });
 
+  // ✅ CONECTAR ao SSE para atualizações em tempo real
+  const { addEventListener } = useSSE();
+
   useEffect(() => {
     if (playerId) {
       fetchBankrollHistory();
     }
   }, [playerId]);
+
+  // ✅ CONECTAR aos eventos SSE para atualização em tempo real
+  useEffect(() => {
+    if (!addEventListener || !playerId) return;
+
+    const removeBalanceListener = addEventListener(
+      "balance_updated",
+      (data) => {
+        console.log("BankrollChart: Saldo atualizado via SSE", data);
+        // ✅ ATUALIZAÇÃO INSTANTÂNEA: Se for para este jogador, recarregar imediatamente
+        if (data.user_id === playerId) {
+          fetchBankrollHistory();
+        }
+      }
+    );
+
+    const removeDashboardRefreshListener = addEventListener(
+      "dashboard_refresh",
+      () => {
+        console.log("BankrollChart: Dashboard refresh via SSE");
+        // ✅ Sempre atualizar quando dashboard refresh é solicitado
+        fetchBankrollHistory();
+      }
+    );
+
+    return () => {
+      removeBalanceListener?.();
+      removeDashboardRefreshListener?.();
+    };
+  }, [addEventListener, playerId]);
 
   const fetchBankrollHistory = async () => {
     try {
@@ -41,11 +75,16 @@ const BankrollChart = ({ playerId }) => {
         `/api/users/${playerId}/bankroll-history?days=30`,
         {
           credentials: "include",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
         }
       );
 
       if (response.ok) {
         const data = await response.json();
+        console.log("Bankroll history data:", data); // Debug log
         const history = data.history || [];
 
         // Processar dados para o gráfico
@@ -148,8 +187,38 @@ const BankrollChart = ({ playerId }) => {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
-            <TrendingUp className="w-12 h-12 mx-auto mb-4" />
-            <p>Nenhum histórico encontrado</p>
+            <TrendingUp className="w-12 h-12 mx-auto mb-4 text-blue-400" />
+            <p className="font-medium mb-2">Sem histórico suficiente</p>
+            <p className="text-xs">
+              Configure saldos e atualize alguns dias para ver a evolução
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ✅ MELHORAR EXPERIÊNCIA: Se só há 1 ponto, mostrar saldo atual + orientação
+  if (chartData.length === 1) {
+    const currentBalance = chartData[0].balance;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">📈 Evolução do Bankroll</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-6">
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {formatCurrency(currentBalance)}
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">Saldo atual</p>
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                💡 <strong>Dica:</strong> Continue atualizando seus saldos
+                diariamente para acompanhar a evolução do seu bankroll ao longo
+                do tempo!
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -218,25 +287,26 @@ const BankrollChart = ({ playerId }) => {
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis
                 dataKey="date"
-                stroke="#6b7280"
+                stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
+                axisLine={false}
               />
               <YAxis
-                stroke="#6b7280"
+                stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
-                tickFormatter={(value) => `$ ${(value / 1000).toFixed(0)}k`}
+                axisLine={false}
+                tickFormatter={(value) => `$${value.toFixed(0)}`}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area
                 type="monotone"
                 dataKey="balance"
                 stroke="#3b82f6"
-                strokeWidth={2}
+                fillOpacity={1}
                 fill="url(#bankrollGradient)"
-                dot={{ fill: "#3b82f6", strokeWidth: 2, r: 3 }}
-                activeDot={{ r: 5, stroke: "#3b82f6", strokeWidth: 2 }}
+                strokeWidth={2}
               />
             </AreaChart>
           </ResponsiveContainer>

@@ -138,6 +138,40 @@ export const useSSE = () => {
         }
       });
 
+      eventSource.addEventListener("withdrawal_status", (event) => {
+        const data = JSON.parse(event.data);
+        console.log("SSE: Status do saque atualizado", data);
+
+        if (listenersRef.current.withdrawal_status) {
+          listenersRef.current.withdrawal_status.forEach((listener) =>
+            listener(data)
+          );
+        }
+
+        if (data.status === "approved") {
+          toast.success(`✅ ${data.message}`);
+        } else if (data.status === "rejected") {
+          toast.error(`❌ ${data.message}`);
+        } else if (data.status === "completed") {
+          toast.success(`🏁 ${data.message}`);
+        } else {
+          toast.info(data.message);
+        }
+      });
+
+      eventSource.addEventListener("reta_changed", (event) => {
+        const data = JSON.parse(event.data);
+        console.log("SSE: Reta alterada", data);
+
+        if (listenersRef.current.reta_changed) {
+          listenersRef.current.reta_changed.forEach((listener) =>
+            listener(data)
+          );
+        }
+
+        toast.warning(`🔄 ${data.message}`);
+      });
+
       eventSource.addEventListener("dashboard_refresh", (event) => {
         console.log("SSE: Dashboard refresh solicitado");
 

@@ -5,85 +5,53 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Download,
-  DollarSign,
-  AlertTriangle,
-  CheckCircle,
-  Info,
-} from "lucide-react";
+import { Download, DollarSign, AlertTriangle, CheckCircle } from "lucide-react";
 import { formatUSD } from "@/lib/utils";
 
 const WithdrawalRequestModal = ({ isOpen, onClose, userId, onSuccess }) => {
-  const [platforms, setPlatforms] = useState([]);
-  const [userAccounts, setUserAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
-  const [formData, setFormData] = useState({
-    platform_id: "",
-    amount: "",
-    player_notes: "",
-  });
+  const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [bestAccount, setBestAccount] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
-      fetchPlatforms();
-      fetchUserAccounts();
+      fetchBestAccount();
       setError("");
       setSuccess(false);
-      setFormData({
-        platform_id: "",
-        amount: "",
-        player_notes: "",
-      });
+      setAmount("");
+      setNotes("");
     }
   }, [isOpen, userId]);
 
-  const fetchPlatforms = async () => {
+  const fetchBestAccount = async () => {
     try {
-      const response = await fetch("/api/platforms", {
+      const response = await fetch(`/api/accounts/?user_id=${userId}`, {
         credentials: "include",
       });
 
       if (response.ok) {
         const data = await response.json();
-        setPlatforms(data.platforms.filter((p) => p.is_active));
-      }
-    } catch (err) {
-      console.error("Erro ao carregar plataformas:", err);
-    }
-  };
-
-  const fetchUserAccounts = async () => {
-    try {
-      const response = await fetch(`/api/accounts?user_id=${userId}`, {
-        credentials: "include",
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Filtrar apenas contas ativas com saldo positivo (sem makeup)
-        setUserAccounts(
-          data.accounts.filter(
-            (acc) => acc.is_active && acc.has_account && acc.current_balance > 0
-          )
+        // Encontrar conta com maior saldo disponível para saque
+        const availableAccounts = data.accounts.filter(
+          (acc) => acc.is_active && acc.has_account && acc.current_balance > 0
         );
+
+        if (availableAccounts.length > 0) {
+          // Pegar conta com maior saldo
+          const best = availableAccounts.reduce((prev, current) =>
+            current.current_balance > prev.current_balance ? current : prev
+          );
+          setBestAccount(best);
+        }
       }
     } catch (err) {
       console.error("Erro ao carregar contas:", err);
@@ -96,49 +64,28 @@ const WithdrawalRequestModal = ({ isOpen, onClose, userId, onSuccess }) => {
     setError("");
 
     try {
-      // Validações
-      if (!formData.platform_id) {
-        setError("Selecione uma plataforma");
+      if (!amount || parseFloat(amount) <= 0) {
+        setError("Informe um valor válido");
         return;
       }
 
-      if (!formData.amount || parseFloat(formData.amount) <= 0) {
-        setError("Informe um valor válido maior que zero");
+      if (!bestAccount) {
+        setError("Nenhuma conta disponível para saque");
         return;
       }
 
-      // Verificar se usuário tem conta na plataforma e saldo suficiente
-      const account = userAccounts.find(
-        (acc) => acc.platform_id === parseInt(formData.platform_id)
-      );
-
-      if (!account) {
-        setError(
-          "Você não possui conta ativa com saldo disponível nesta plataforma"
-        );
+      if (parseFloat(amount) > bestAccount.current_balance) {
+        setError(`Valor máximo: $${bestAccount.current_balance.toFixed(2)}`);
         return;
       }
 
-      if (account.current_balance <= 0) {
-        setError("Não é possível sacar de contas com saldo negativo ou zerado");
-        return;
-      }
-
-      if (parseFloat(formData.amount) > account.current_balance) {
-        setError("Valor solicitado excede o saldo disponível");
-        return;
-      }
-
-      const response = await fetch("/api/withdrawal-requests", {
+      const response = await fetch("/api/withdrawal-requests/", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
-          platform_id: parseInt(formData.platform_id),
-          amount: parseFloat(formData.amount),
-          user_id: userId,
+          platform_id: bestAccount.platform_id,
+          amount: parseFloat(amount),
+          player_notes: notes || "Solicitação de saque",
         }),
         credentials: "include",
       });
@@ -150,222 +97,158 @@ const WithdrawalRequestModal = ({ isOpen, onClose, userId, onSuccess }) => {
         setTimeout(() => {
           onSuccess && onSuccess(data.withdrawal_request);
           onClose();
-        }, 2000);
+          setAmount("");
+          setNotes("");
+        }, 1500);
       } else {
         setError(data.error || "Erro ao criar solicitação");
       }
     } catch (err) {
-      setError("Erro de conexão com o servidor");
+      setError("Erro de conexão");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const getAccountForPlatform = () => {
-    return userAccounts.find(
-      (acc) => acc.platform_id === parseInt(formData.platform_id)
-    );
-  };
-
   const formatCurrency = (value) => formatUSD(value);
-
-  const getMaxWithdrawal = () => {
-    const account = getAccountForPlatform();
-    return account ? account.current_balance : 0;
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="gradient-gold-text flex items-center">
-            <Download className="w-5 h-5 mr-2" />
-            Solicitar Saque
+          <DialogTitle className="text-xl font-bold text-foreground">
+            💸 Solicitar Saque
           </DialogTitle>
-          <DialogDescription>
-            Preencha os dados para solicitar um saque de sua conta.
+          <DialogDescription className="text-foreground/70">
+            Solicite um saque da sua melhor conta
           </DialogDescription>
         </DialogHeader>
 
         {success ? (
-          <div className="text-center py-8">
-            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Solicitação Criada!</h3>
-            <p className="text-muted-foreground">
-              Sua solicitação de saque foi enviada e está aguardando aprovação.
+          <div className="text-center py-6">
+            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
+            <h3 className="font-semibold mb-2 text-foreground">
+              Solicitação Enviada!
+            </h3>
+            <p className="text-sm text-foreground/70">
+              Aguardando aprovação do admin
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="text-red-700 dark:text-red-300 font-medium">
+                  {error}
+                </AlertDescription>
               </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="platform">Plataforma</Label>
-              <Select
-                value={formData.platform_id}
-                onValueChange={(value) => handleChange("platform_id", value)}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a plataforma" />
-                </SelectTrigger>
-                <SelectContent>
-                  {userAccounts
-                    .filter((acc) => acc.current_balance > 0)
-                    .map((account) => {
-                      const platform = platforms.find(
-                        (p) => p.id === account.platform_id
-                      );
-
-                      return platform ? (
-                        <SelectItem
-                          key={account.platform_id}
-                          value={account.platform_id.toString()}
-                        >
-                          <div className="flex items-center justify-between w-full">
-                            <span>{platform.display_name}</span>
-                            <span className="text-xs status-complete ml-2">
-                              {formatCurrency(account.current_balance)}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ) : null;
-                    })}
-                </SelectContent>
-              </Select>
-
-              {formData.platform_id && (
-                <div className="text-sm">
-                  {(() => {
-                    const account = getAccountForPlatform();
-                    if (account) {
-                      return (
-                        <div className="bg-secondary/20 p-3 rounded space-y-2">
-                          <div className="flex justify-between">
-                            <span>Saldo disponível:</span>
-                            <span className="font-medium invictus-gold">
-                              {formatCurrency(account.current_balance)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Valor máximo:</span>
-                            <span>
-                              {formatCurrency(account.current_balance)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
+            {/* Info da Conta Selecionada Automaticamente */}
+            {bestAccount && (
+              <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-blue-700 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-blue-800 dark:text-blue-200">
+                      💳 {bestAccount.platform_name}
+                    </h3>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Saldo disponível:{" "}
+                      {formatCurrency(bestAccount.current_balance)}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="amount">Valor do Saque</Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="amount"
+                  className="text-base font-bold text-foreground"
+                >
+                  💸 Valor do Saque
+                </Label>
+                {bestAccount && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAmount(bestAccount.current_balance.toString())
+                    }
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                  >
+                    Sacar Tudo ({formatCurrency(bestAccount.current_balance)})
+                  </button>
+                )}
+              </div>
+              <div className="relative mt-2">
+                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-blue-600" />
                 <Input
                   id="amount"
                   type="number"
                   step="0.01"
                   min="0.01"
-                  max={getMaxWithdrawal()}
-                  placeholder="0.00"
-                  value={formData.amount}
-                  onChange={(e) => handleChange("amount", e.target.value)}
-                  className="pl-10"
+                  max={bestAccount?.current_balance || 0}
+                  placeholder="100.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="pl-10 h-12 text-lg text-foreground bg-background border-2"
                   disabled={loading}
                   required
                 />
               </div>
-
-              {formData.platform_id && getMaxWithdrawal() > 0 && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">
-                    Máximo disponível:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleChange("amount", getMaxWithdrawal().toString())
-                    }
-                    className="text-primary hover:underline"
-                  >
-                    {formatCurrency(getMaxWithdrawal())} (sacar tudo)
-                  </button>
-                </div>
-              )}
-
-              {parseFloat(formData.amount) > getMaxWithdrawal() &&
-                formData.amount && (
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      O valor não pode exceder o saldo disponível.
-                    </AlertDescription>
-                  </Alert>
-                )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Motivo do Saque</Label>
+            <div>
+              <Label
+                htmlFor="notes"
+                className="text-base font-bold text-foreground"
+              >
+                📝 Motivo do Saque
+              </Label>
               <Textarea
                 id="notes"
-                placeholder="Explique o motivo do saque (obrigatório para valores altos)..."
-                value={formData.player_notes}
-                onChange={(e) => handleChange("player_notes", e.target.value)}
+                placeholder="Ex: Lucro da sessão, pagamento..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 rows={3}
                 disabled={loading}
-                required={parseFloat(formData.amount) > 500}
+                className="mt-2 text-foreground bg-background border-2"
+                required={parseFloat(amount) > 500}
               />
+              {parseFloat(amount) > 500 && (
+                <p className="text-sm text-orange-600 dark:text-orange-400 mt-1 font-medium">
+                  * Motivo obrigatório para valores acima de $500
+                </p>
+              )}
             </div>
 
-            {parseFloat(formData.amount) > 500 && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Saques acima de $500 precisam de justificativa e podem demorar
-                  mais para ser aprovados.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex justify-end space-x-3">
+            <div className="flex gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={loading}
+                className="flex-1 border-2 text-foreground hover:bg-red-50 hover:border-red-300 dark:hover:bg-red-950/20 font-medium"
               >
-                Cancelar
+                ❌ Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={
                   loading ||
-                  !formData.platform_id ||
-                  !formData.amount ||
-                  parseFloat(formData.amount) > getMaxWithdrawal() ||
-                  (parseFloat(formData.amount) > 500 &&
-                    !formData.player_notes.trim())
+                  !bestAccount ||
+                  !amount ||
+                  parseFloat(amount) > (bestAccount?.current_balance || 0) ||
+                  (parseFloat(amount) > 500 && !notes.trim())
                 }
-                className="gradient-gold"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold"
               >
-                {loading ? "Enviando..." : "Solicitar Saque"}
+                {loading ? "Enviando..." : "🚀 Solicitar"}
               </Button>
             </div>
           </form>

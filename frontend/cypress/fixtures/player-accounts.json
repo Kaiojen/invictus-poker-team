@@ -1,0 +1,44 @@
+[
+  {
+    "id": 1,
+    "platform": {
+      "name": "pokerstars",
+      "display_name": "PokerStars"
+    },
+    "current_balance": 1200.5,
+    "initial_balance": 1000.0,
+    "pnl": 200.5,
+    "includes_in_pnl": true,
+    "has_account": true,
+    "total_reloads": 3500.0,
+    "total_withdrawals": 2300.0
+  },
+  {
+    "id": 2,
+    "platform": {
+      "name": "gg",
+      "display_name": "GGPoker"
+    },
+    "current_balance": 850.75,
+    "initial_balance": 700.0,
+    "pnl": 150.75,
+    "includes_in_pnl": true,
+    "has_account": true,
+    "total_reloads": 2800.0,
+    "total_withdrawals": 1950.0
+  },
+  {
+    "id": 3,
+    "platform": {
+      "name": "luxon",
+      "display_name": "Luxon"
+    },
+    "current_balance": 400.0,
+    "initial_balance": 300.0,
+    "pnl": 100.0,
+    "includes_in_pnl": false,
+    "has_account": true,
+    "total_reloads": 1200.0,
+    "total_withdrawals": 800.0
+  }
+]

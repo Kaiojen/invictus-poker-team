@@ -69,51 +69,69 @@ const AdvancedFilters = ({
 
     // Aplicar filtro de busca
     if (searchTerm) {
-      const searchFields = filterConfig.searchFields || ['name', 'title', 'username'];
-      result = result.filter(item =>
-        searchFields.some(field =>
-          item[field]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+      const searchFields = filterConfig.searchFields || [
+        "name",
+        "title",
+        "username",
+      ];
+      result = result.filter((item) =>
+        searchFields.some((field) =>
+          item[field]
+            ?.toString()
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
         )
       );
     }
 
     // Aplicar filtros específicos
     Object.entries(filters).forEach(([key, value]) => {
-      if (value && value !== 'all') {
-        const filterDef = filterConfig.filters?.find(f => f.key === key);
-        
+      if (value && value !== "all") {
+        const filterDef = filterConfig.filters?.find((f) => f.key === key);
+
         if (filterDef) {
           switch (filterDef.type) {
-            case 'select':
-              result = result.filter(item => item[key] === value);
+            case "select":
+              result = result.filter((item) => item[key] === value);
               break;
-            case 'multiselect':
+            case "multiselect":
               if (Array.isArray(value) && value.length > 0) {
-                result = result.filter(item => value.includes(item[key]));
+                result = result.filter((item) => value.includes(item[key]));
               }
               break;
-            case 'range':
+            case "range":
               if (value.min !== undefined) {
-                result = result.filter(item => Number(item[key]) >= Number(value.min));
+                result = result.filter(
+                  (item) => Number(item[key]) >= Number(value.min)
+                );
               }
               if (value.max !== undefined) {
-                result = result.filter(item => Number(item[key]) <= Number(value.max));
+                result = result.filter(
+                  (item) => Number(item[key]) <= Number(value.max)
+                );
               }
               break;
-            case 'date_range':
+            case "date_range":
               if (value.start) {
-                result = result.filter(item => new Date(item[key]) >= new Date(value.start));
+                result = result.filter(
+                  (item) => new Date(item[key]) >= new Date(value.start)
+                );
               }
               if (value.end) {
-                result = result.filter(item => new Date(item[key]) <= new Date(value.end));
+                result = result.filter(
+                  (item) => new Date(item[key]) <= new Date(value.end)
+                );
               }
               break;
-            case 'boolean':
-              result = result.filter(item => Boolean(item[key]) === value);
+            case "boolean":
+              result = result.filter((item) => Boolean(item[key]) === value);
               break;
             default:
-              result = result.filter(item => 
-                item[key]?.toString().toLowerCase().includes(value.toLowerCase())
+              result = result.filter((item) =>
+                item[key]
+                  ?.toString()
+                  .toLowerCase()
+                  .includes(value.toLowerCase())
               );
           }
         }
@@ -125,70 +143,74 @@ const AdvancedFilters = ({
       result.sort((a, b) => {
         let aVal = a[sortBy];
         let bVal = b[sortBy];
-        
+
         // Tratar números
         if (!isNaN(aVal) && !isNaN(bVal)) {
           aVal = Number(aVal);
           bVal = Number(bVal);
         }
-        
+
         // Tratar datas
-        if (sortBy.includes('date') || sortBy.includes('_at')) {
+        if (sortBy.includes("date") || sortBy.includes("_at")) {
           aVal = new Date(aVal);
           bVal = new Date(bVal);
         }
-        
-        if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+
+        if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+        if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
         return 0;
       });
     }
 
     setFilteredData(result);
-    
+
     // Atualizar lista de filtros ativos
     const active = [];
     if (searchTerm) {
-      active.push({ key: 'search', label: `Busca: "${searchTerm}"`, value: searchTerm });
+      active.push({
+        key: "search",
+        label: `Busca: "${searchTerm}"`,
+        value: searchTerm,
+      });
     }
-    
+
     Object.entries(filters).forEach(([key, value]) => {
-      if (value && value !== 'all') {
-        const filterDef = filterConfig.filters?.find(f => f.key === key);
+      if (value && value !== "all") {
+        const filterDef = filterConfig.filters?.find((f) => f.key === key);
         if (filterDef) {
           let label = `${filterDef.label}: `;
-          
-          if (filterDef.type === 'range') {
-            label += `${value.min || '0'} - ${value.max || '∞'}`;
-          } else if (filterDef.type === 'date_range') {
-            label += `${value.start || ''} - ${value.end || ''}`;
+
+          if (filterDef.type === "range") {
+            label += `${value.min || "0"} - ${value.max || "∞"}`;
+          } else if (filterDef.type === "date_range") {
+            label += `${value.start || ""} - ${value.end || ""}`;
           } else if (Array.isArray(value)) {
-            label += value.join(', ');
+            label += value.join(", ");
           } else {
             label += value;
           }
-          
+
           active.push({ key, label, value });
         }
       }
     });
-    
+
     setActiveFilters(active);
     onFilterChange?.(result);
   };
 
   const updateFilter = (key, value) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
-      [key]: value
+      [key]: value,
     }));
   };
 
   const removeFilter = (key) => {
-    if (key === 'search') {
+    if (key === "search") {
       setSearchTerm("");
     } else {
-      setFilters(prev => {
+      setFilters((prev) => {
         const newFilters = { ...prev };
         delete newFilters[key];
         return newFilters;
@@ -208,13 +230,20 @@ const AdvancedFilters = ({
     const value = filters[key];
 
     switch (type) {
-      case 'select':
+      case "select":
         return (
           <div key={key} className="space-y-2">
             <Label>{label}</Label>
-            <Select value={value || 'all'} onValueChange={(val) => updateFilter(key, val)}>
+            <Select
+              value={value || "all"}
+              onValueChange={(val) => updateFilter(key, val)}
+            >
               <SelectTrigger>
-                <SelectValue placeholder={placeholder || `Selecione ${label.toLowerCase()}`} />
+                <SelectValue
+                  placeholder={
+                    placeholder || `Selecione ${label.toLowerCase()}`
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
@@ -228,7 +257,7 @@ const AdvancedFilters = ({
           </div>
         );
 
-      case 'multiselect':
+      case "multiselect":
         return (
           <div key={key} className="space-y-2">
             <Label>{label}</Label>
@@ -243,7 +272,10 @@ const AdvancedFilters = ({
                       if (checked) {
                         updateFilter(key, [...current, option.value]);
                       } else {
-                        updateFilter(key, current.filter(v => v !== option.value));
+                        updateFilter(
+                          key,
+                          current.filter((v) => v !== option.value)
+                        );
                       }
                     }}
                   />
@@ -256,7 +288,7 @@ const AdvancedFilters = ({
           </div>
         );
 
-      case 'range':
+      case "range":
         return (
           <div key={key} className="space-y-2">
             <Label>{label}</Label>
@@ -264,41 +296,51 @@ const AdvancedFilters = ({
               <Input
                 type="number"
                 placeholder="Mín"
-                value={value?.min || ''}
-                onChange={(e) => updateFilter(key, { ...value, min: e.target.value })}
+                value={value?.min || ""}
+                onChange={(e) =>
+                  updateFilter(key, { ...value, min: e.target.value })
+                }
               />
               <Input
                 type="number"
                 placeholder="Máx"
-                value={value?.max || ''}
-                onChange={(e) => updateFilter(key, { ...value, max: e.target.value })}
+                value={value?.max || ""}
+                onChange={(e) =>
+                  updateFilter(key, { ...value, max: e.target.value })
+                }
               />
             </div>
           </div>
         );
 
-      case 'date_range':
+      case "date_range":
         return (
           <div key={key} className="space-y-2">
             <Label>{label}</Label>
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 date-filter-fix">
               <Input
                 type="date"
                 placeholder="Data inicial"
-                value={value?.start || ''}
-                onChange={(e) => updateFilter(key, { ...value, start: e.target.value })}
+                value={value?.start || ""}
+                onChange={(e) =>
+                  updateFilter(key, { ...value, start: e.target.value })
+                }
+                className="date-filter-fix"
               />
               <Input
                 type="date"
                 placeholder="Data final"
-                value={value?.end || ''}
-                onChange={(e) => updateFilter(key, { ...value, end: e.target.value })}
+                value={value?.end || ""}
+                onChange={(e) =>
+                  updateFilter(key, { ...value, end: e.target.value })
+                }
+                className="date-filter-fix"
               />
             </div>
           </div>
         );
 
-      case 'boolean':
+      case "boolean":
         return (
           <div key={key} className="space-y-2">
             <div className="flex items-center space-x-2">
@@ -318,7 +360,7 @@ const AdvancedFilters = ({
             <Label>{label}</Label>
             <Input
               placeholder={placeholder || `Digite ${label.toLowerCase()}`}
-              value={value || ''}
+              value={value || ""}
               onChange={(e) => updateFilter(key, e.target.value)}
             />
           </div>
@@ -449,7 +491,8 @@ const AdvancedFilters = ({
 
         {/* Resultados */}
         <div className="text-sm text-muted-foreground mb-4">
-          {filteredData.length} resultado{filteredData.length !== 1 ? 's' : ''} encontrado{filteredData.length !== 1 ? 's' : ''}
+          {filteredData.length} resultado{filteredData.length !== 1 ? "s" : ""}{" "}
+          encontrado{filteredData.length !== 1 ? "s" : ""}
         </div>
       </div>
     );
@@ -466,7 +509,9 @@ const AdvancedFilters = ({
                 <span>Filtros Avançados</span>
               </CardTitle>
               <CardDescription>
-                {filteredData.length} de {data.length} item{data.length !== 1 ? 's' : ''} exibido{data.length !== 1 ? 's' : ''}
+                {filteredData.length} de {data.length} item
+                {data.length !== 1 ? "s" : ""} exibido
+                {data.length !== 1 ? "s" : ""}
               </CardDescription>
             </div>
 
@@ -527,4 +572,3 @@ const AdvancedFilters = ({
 };
 
 export default AdvancedFilters;
-

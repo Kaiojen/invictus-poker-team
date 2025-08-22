@@ -457,12 +457,12 @@ const ReportManagement = ({ user }) => {
 
       {/* Dialog de Preview */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl report-preview">
           <DialogHeader>
-            <DialogTitle className="text-foreground">
+            <DialogTitle className="font-semibold">
               Preview dos Dados do Relatório
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            <DialogDescription className="text-gray-600">
               Visualização dos dados que serão incluídos no relatório
             </DialogDescription>
           </DialogHeader>
@@ -470,17 +470,15 @@ const ReportManagement = ({ user }) => {
           {previewData && (
             <div className="space-y-4 max-h-96 overflow-y-auto">
               {/* Informações Gerais */}
-              <div className="grid grid-cols-2 gap-4 text-foreground">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium text-foreground">
+                  <Label className="text-sm font-medium">
                     Tipo de Relatório
                   </Label>
                   <p className="text-sm">{previewData.report_type}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-foreground">
-                    Período
-                  </Label>
+                  <Label className="text-sm font-medium">Período</Label>
                   <p className="text-sm">
                     {new Date(previewData.period.start).toLocaleDateString(
                       "pt-BR"
@@ -598,6 +596,7 @@ const ReportManagement = ({ user }) => {
             <Button
               variant="outline"
               onClick={() => setShowPreviewDialog(false)}
+              className="cancel-button-fix"
             >
               Fechar
             </Button>

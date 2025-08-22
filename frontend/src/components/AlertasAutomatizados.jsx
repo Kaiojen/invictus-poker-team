@@ -47,14 +47,30 @@ import { toast } from "sonner";
 const ALERT_CONFIGS = {
   pending_reloads: {
     name: "Reloads Pendentes",
-    description: "Reloads aguardando aprovação há mais de 24h",
+    description: "Reloads aguardando aprovação",
     icon: Clock,
     type: "warning",
     threshold: 1,
-    checkFunction: (data) =>
-      data.pendingReloads?.filter(
-        (r) => new Date() - new Date(r.created_at) > 24 * 60 * 60 * 1000
-      ).length || 0,
+    checkFunction: (data) => {
+      // Buscar tanto recent_requests quanto statistics
+      const recentRequests =
+        data.recent_requests?.filter((r) => r.status === "pending")?.length ||
+        0;
+      const statisticsPending = data.statistics?.pending_reload_requests || 0;
+      return Math.max(recentRequests, statisticsPending);
+    },
+  },
+  pending_withdrawals: {
+    name: "Saques Pendentes",
+    description: "Saques aguardando aprovação",
+    icon: Clock,
+    type: "warning",
+    threshold: 1,
+    checkFunction: (data) => {
+      const statisticsPending =
+        data.statistics?.pending_withdrawal_requests || 0;
+      return statisticsPending;
+    },
   },
   low_balances: {
     name: "Saldos Baixos",
@@ -137,18 +153,65 @@ const AlertasAutomatizados = ({ user }) => {
     setLoading(true);
     try {
       // Buscar dados do sistema para análise
-      const [dashboardRes, playersRes] = await Promise.all([
-        fetch("/api/dashboard/manager", { credentials: "include" }),
-        fetch("/api/planilhas/overview", { credentials: "include" }),
-      ]);
+      const [dashboardRes, playersRes, reloadRes, withdrawalRes] =
+        await Promise.all([
+          fetch("/api/dashboard/manager", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }),
+          fetch("/api/planilhas/overview", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }),
+          fetch("/api/reload_requests/?status=pending", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }),
+          fetch("/api/withdrawal_requests/?status=pending", {
+            credentials: "include",
+            headers: {
+              "Cache-Control": "no-cache",
+              Pragma: "no-cache",
+            },
+          }),
+        ]);
 
       if (dashboardRes.ok && playersRes.ok) {
         const dashboardData = await dashboardRes.json();
         const playersData = await playersRes.json();
 
+        // Adicionar dados de reload requests se disponível
+        let pendingReloads = [];
+        if (reloadRes.ok || reloadRes.status === 304) {
+          if (reloadRes.status !== 304) {
+            const reloadData = await reloadRes.json();
+            pendingReloads = reloadData.reload_requests || [];
+          }
+        }
+
+        // Adicionar dados de withdrawal requests se disponível
+        let pendingWithdrawals = [];
+        if (withdrawalRes.ok || withdrawalRes.status === 304) {
+          if (withdrawalRes.status !== 304) {
+            const withdrawalData = await withdrawalRes.json();
+            pendingWithdrawals = withdrawalData.withdrawal_requests || [];
+          }
+        }
+
         const systemData = {
           ...dashboardData,
           players: playersData.players || [],
+          pendingReloads,
+          pendingWithdrawals,
         };
 
         // Verificar cada configuração de alerta

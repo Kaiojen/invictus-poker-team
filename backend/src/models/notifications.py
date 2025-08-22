@@ -5,18 +5,20 @@ from datetime import datetime
 import enum
 
 class NotificationType(enum.Enum):
-    INFO = "info"
-    WARNING = "warning"
-    SUCCESS = "success"
-    ERROR = "error"
-    URGENT = "urgent"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    SUCCESS = "SUCCESS"
+    ERROR = "ERROR"
+    URGENT = "URGENT"
+    ACTION_REQUIRED = "ACTION_REQUIRED"
 
 class NotificationCategory(enum.Enum):
-    RELOAD_REQUEST = "reload_request"
-    WITHDRAWAL_REQUEST = "withdrawal_request"
-    ACCOUNT_UPDATE = "account_update"
-    SYSTEM_MESSAGE = "system_message"
-    PLAYER_ALERT = "player_alert"
+    RELOAD_REQUEST = "RELOAD_REQUEST"
+    WITHDRAWAL_REQUEST = "WITHDRAWAL_REQUEST"
+    ACCOUNT_UPDATE = "ACCOUNT_UPDATE"
+    SYSTEM_MESSAGE = "SYSTEM_MESSAGE"
+    PLAYER_ALERT = "PLAYER_ALERT"
+    REGISTRATION = "REGISTRATION"
     COMPLIANCE = "compliance"
     PERFORMANCE = "performance"
 
